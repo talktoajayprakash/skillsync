@@ -7,31 +7,13 @@ import { GDriveBackend } from "../backends/gdrive.js";
 export async function initCommand(): Promise<void> {
   console.log(chalk.bold("\nSkillSync Init\n"));
 
-  // Google Drive setup
   console.log("Google Drive...");
 
   if (!credentialsExist()) {
     console.log(
       chalk.red("  ✗ No credentials found at ~/.skillssync/credentials.json")
     );
-    console.log(chalk.dim("    To set up Google Drive:"));
-    console.log(
-      chalk.dim("    1. Go to https://console.cloud.google.com/")
-    );
-    console.log(
-      chalk.dim("    2. Create a project → Enable Google Drive API")
-    );
-    console.log(
-      chalk.dim(
-        "    3. Create OAuth credentials (Desktop app) → Download JSON"
-      )
-    );
-    console.log(
-      chalk.dim("    4. Save as ~/.skillssync/credentials.json")
-    );
-    console.log(
-      chalk.dim('    5. Run "skillsync init" again')
-    );
+    console.log(chalk.dim("    Run: skillsync setup google"));
     console.log();
     return;
   }
@@ -45,48 +27,48 @@ export async function initCommand(): Promise<void> {
     console.log(chalk.green("  ✓ Authenticated"));
   }
 
-  const spinner = ora("  Discovering registries...").start();
+  const spinner = ora("  Discovering collections...").start();
   const backend = new GDriveBackend(auth);
-  const registries = await backend.discoverRegistries();
+  const collections = await backend.discoverCollections();
   spinner.stop();
 
-  if (registries.length === 0) {
+  if (collections.length === 0) {
     console.log(
       chalk.yellow(
-        "  ✗ No registries found (no SKILLS_SYNC.yaml files owned by you)"
+        "  ✗ No collections found (no SKILLS_SYNC.yaml files owned by you)"
       )
     );
     console.log(
       chalk.dim(
-        "    Create a folder in Google Drive with a SKILLS_SYNC.yaml file to get started."
+        '    Run "skillsync collection create" to create your first collection.'
       )
     );
   } else {
     console.log(
-      chalk.green(`  ✓ Found ${registries.length} registry(ies):`)
+      chalk.green(`  ✓ Found ${collections.length} collection(s):`)
     );
-    for (const r of registries) {
-      const reg = await backend.readRegistry(r);
+    for (const c of collections) {
+      const col = await backend.readCollection(c);
       console.log(
-        `    gdrive:${r.name}  (${reg.skills.length} skills)`
+        `    gdrive:${c.name}  (${col.skills.length} skills)`
       );
     }
   }
 
   writeConfig({
-    registries,
+    collections,
     discoveredAt: new Date().toISOString(),
   });
 
-  const totalSkills = registries.length > 0
-    ? (await Promise.all(registries.map((r) => backend.readRegistry(r)))).reduce(
-        (sum, reg) => sum + reg.skills.length,
+  const totalSkills = collections.length > 0
+    ? (await Promise.all(collections.map((c) => backend.readCollection(c)))).reduce(
+        (sum, col) => sum + col.skills.length,
         0
       )
     : 0;
 
   console.log(
-    `\n${totalSkills} skills available across ${registries.length} registry(ies).`
+    `\n${totalSkills} skills available across ${collections.length} collection(s).`
   );
   console.log(
     `\nRun ${chalk.bold("skillsync list")} to browse all available skills.\n`

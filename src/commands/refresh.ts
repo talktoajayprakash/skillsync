@@ -5,28 +5,28 @@ import { getAuthClient } from "../auth.js";
 import { GDriveBackend } from "../backends/gdrive.js";
 
 export async function refreshCommand(): Promise<void> {
-  const spinner = ora("Discovering registries...").start();
+  const spinner = ora("Discovering collections...").start();
 
   try {
     const auth = getAuthClient();
     const backend = new GDriveBackend(auth);
-    const registries = await backend.discoverRegistries();
+    const collections = await backend.discoverCollections();
 
     writeConfig({
-      registries,
+      collections,
       discoveredAt: new Date().toISOString(),
     });
 
     spinner.stop();
 
-    if (registries.length === 0) {
-      console.log(chalk.yellow("No registries found."));
+    if (collections.length === 0) {
+      console.log(chalk.yellow("No collections found."));
     } else {
       console.log(
-        chalk.green(`Found ${registries.length} registry(ies):`)
+        chalk.green(`Found ${collections.length} collection(s):`)
       );
-      for (const r of registries) {
-        console.log(`  gdrive:${r.name}`);
+      for (const c of collections) {
+        console.log(`  gdrive:${c.name}`);
       }
     }
 

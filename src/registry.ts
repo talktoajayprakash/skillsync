@@ -1,7 +1,7 @@
 import YAML from "yaml";
-import type { RegistryFile } from "./types.js";
+import type { CollectionFile } from "./types.js";
 
-export function parseRegistry(content: string): RegistryFile {
+export function parseRegistry(content: string): CollectionFile {
   const data = YAML.parse(content);
   return {
     name: data.name ?? "",
@@ -14,7 +14,7 @@ export function parseRegistry(content: string): RegistryFile {
   };
 }
 
-export function serializeRegistry(registry: RegistryFile): string {
+export function serializeRegistry(registry: CollectionFile): string {
   return YAML.stringify({
     name: registry.name,
     owner: registry.owner,

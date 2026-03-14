@@ -7,6 +7,7 @@ import YAML from "yaml";
 import { readConfig, writeConfig, CONFIG_PATH } from "../config.js";
 import { getAuthClient } from "../auth.js";
 import { GDriveBackend } from "../backends/gdrive.js";
+import type { Config } from "../types.js";
 
 function ask(question: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -17,11 +18,10 @@ function ask(question: string): Promise<string> {
 
 export async function addCommand(
   skillPath: string,
-  options: { registry?: string }
+  options: { collection?: string }
 ): Promise<void> {
   const absPath = path.resolve(skillPath);
 
-  // Validate the skill directory
   if (!fs.existsSync(absPath) || !fs.statSync(absPath).isDirectory()) {
     console.log(chalk.red(`"${skillPath}" is not a valid directory.`));
     return;
@@ -33,7 +33,6 @@ export async function addCommand(
     return;
   }
 
-  // Parse SKILL.md frontmatter to get name and description
   const content = fs.readFileSync(skillMdPath, "utf-8");
   const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (!frontmatterMatch) {
@@ -50,82 +49,71 @@ export async function addCommand(
     return;
   }
 
-  let config;
+  let config: Config;
   try {
     config = readConfig();
   } catch {
-    config = { registries: [], discoveredAt: new Date().toISOString() };
+    config = { collections: [], discoveredAt: new Date().toISOString() };
   }
 
-  if (config.registries.length === 0) {
-    console.log(chalk.yellow("No registries found."));
-    const ans = await ask(`Create a new registry in Google Drive now? ${chalk.dim("[y/n]")} `);
+  if (config.collections.length === 0) {
+    console.log(chalk.yellow("No collections found."));
+    const ans = await ask(`Create a new collection in Google Drive now? ${chalk.dim("[y/n]")} `);
     if (!ans.toLowerCase().startsWith("y")) {
-      console.log(chalk.dim("Run 'skillsync registry create' to set one up."));
+      console.log(chalk.dim("Run 'skillsync collection create' to set one up."));
       return;
     }
-    const nameInput = await ask(`Registry name ${chalk.dim('(leave blank for "my-skills")')}: `);
+    const nameInput = await ask(`Collection name ${chalk.dim('(leave blank for "my-skills")')}: `);
     const folderName = nameInput || "my-skills";
 
     const auth = getAuthClient();
     const backend = new GDriveBackend(auth);
-    const spinner = ora(`Creating registry "${folderName}" in Google Drive...`).start();
+    const spinner = ora(`Creating collection "${folderName}" in Google Drive...`).start();
     try {
-      const registry = await backend.createRegistry(folderName);
-      spinner.succeed(`Registry "${folderName}" created`);
-      config.registries.push(registry);
+      const collection = await backend.createCollection(folderName);
+      spinner.succeed(`Collection "${folderName}" created`);
+      config.collections.push(collection);
       writeConfig(config);
     } catch (err) {
-      spinner.fail(`Failed to create registry: ${(err as Error).message}`);
+      spinner.fail(`Failed to create collection: ${(err as Error).message}`);
       return;
     }
   }
 
-  // Pick registry — first one by default, or by name
-  let registry = config.registries[0];
-  if (options.registry) {
-    const found = config.registries.find((r) => r.name === options.registry);
+  // Pick collection — first one by default, or by name
+  let collection = config.collections[0];
+  if (options.collection) {
+    const found = config.collections.find((c) => c.name === options.collection);
     if (!found) {
-      console.log(chalk.red(`Registry "${options.registry}" not found.`));
+      console.log(chalk.red(`Collection "${options.collection}" not found.`));
       return;
     }
-    registry = found;
+    collection = found;
   }
 
   const auth = getAuthClient();
   const backend = new GDriveBackend(auth);
 
   const spinner = ora(
-    `Adding ${chalk.bold(skillName)} to ${registry.name}...`
+    `Adding ${chalk.bold(skillName)} to ${collection.name}...`
   ).start();
 
   try {
-    // Upload skill directory
-    await backend.uploadSkill(registry, absPath, skillName);
+    await backend.uploadSkill(collection, absPath, skillName);
 
-    // Update registry
-    const reg = await backend.readRegistry(registry);
+    const col = await backend.readCollection(collection);
 
-    // Check for duplicate
-    const existing = reg.skills.findIndex((s) => s.name === skillName);
+    const existing = col.skills.findIndex((s) => s.name === skillName);
     if (existing >= 0) {
-      reg.skills[existing] = {
-        name: skillName,
-        path: `${skillName}/`,
-        description,
-      };
+      col.skills[existing] = { name: skillName, path: `${skillName}/`, description };
     } else {
-      reg.skills.push({
-        name: skillName,
-        path: `${skillName}/`,
-        description,
-      });
+      col.skills.push({ name: skillName, path: `${skillName}/`, description });
     }
 
-    await backend.writeRegistry(registry, reg);
+    await backend.writeCollection(collection, col);
 
     spinner.succeed(
-      `${chalk.bold(skillName)} added to gdrive:${registry.name}`
+      `${chalk.bold(skillName)} added to gdrive:${collection.name}`
     );
   } catch (err) {
     spinner.fail(`Failed: ${(err as Error).message}`);

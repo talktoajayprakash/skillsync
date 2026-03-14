@@ -14,28 +14,27 @@ function ask(question: string): Promise<string> {
   });
 }
 
-export async function registryCreateCommand(): Promise<void> {
-  const name = await ask(`Registry name ${chalk.dim('(leave blank for "my-skills")')}: `);
+export async function collectionCreateCommand(): Promise<void> {
+  const name = await ask(`Collection name ${chalk.dim('(leave blank for "my-skills")')}: `);
   const folderName = name || "my-skills";
 
   const auth = getAuthClient();
   const backend = new GDriveBackend(auth);
-  const spinner = ora(`Creating registry "${folderName}" in Google Drive...`).start();
+  const spinner = ora(`Creating collection "${folderName}" in Google Drive...`).start();
 
   try {
-    const registry = await backend.createRegistry(folderName);
-    spinner.succeed(`Registry "${folderName}" created in Google Drive`);
+    const collection = await backend.createCollection(folderName);
+    spinner.succeed(`Collection "${folderName}" created in Google Drive`);
 
-    // Merge into config
-    let config: Config = { registries: [], discoveredAt: new Date().toISOString() };
+    let config: Config = { collections: [], discoveredAt: new Date().toISOString() };
     if (fs.existsSync(CONFIG_PATH)) {
       try { config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as Config; } catch { /* use default */ }
     }
-    const already = config.registries.findIndex((r) => r.name === registry.name);
+    const already = config.collections.findIndex((c) => c.name === collection.name);
     if (already >= 0) {
-      config.registries[already] = registry;
+      config.collections[already] = collection;
     } else {
-      config.registries.push(registry);
+      config.collections.push(collection);
     }
     writeConfig(config);
 

@@ -7,13 +7,13 @@ export interface SkillEntry {
   description: string;
 }
 
-export interface RegistryFile {
+export interface CollectionFile {
   name: string;
   owner: string;
   skills: SkillEntry[];
 }
 
-export interface RegistryInfo {
+export interface CollectionInfo {
   name: string;
   backend: "gdrive";
   folderId: string;
@@ -21,14 +21,14 @@ export interface RegistryInfo {
 }
 
 export interface Config {
-  registries: RegistryInfo[];
+  collections: CollectionInfo[];
   discoveredAt: string;
 }
 
-// Resolved skill = skill entry + which registry it came from
+// Resolved skill = skill entry + which collection it came from
 export interface ResolvedSkill {
   entry: SkillEntry;
-  registry: RegistryInfo;
+  collection: CollectionInfo;
 }
 
 // Agent name → user-level skills directory path

@@ -11,10 +11,10 @@ export async function getAllSkills(): Promise<ResolvedSkill[]> {
   const backend = new GDriveBackend(auth);
   const allSkills: ResolvedSkill[] = [];
 
-  for (const registry of config.registries) {
-    const reg = await backend.readRegistry(registry);
-    for (const entry of reg.skills) {
-      allSkills.push({ entry, registry });
+  for (const collection of config.collections) {
+    const col = await backend.readCollection(collection);
+    for (const entry of col.skills) {
+      allSkills.push({ entry, collection });
     }
   }
 
@@ -29,10 +29,10 @@ export async function listCommand(): Promise<void> {
     spinner.stop();
 
     if (skills.length === 0) {
-      console.log(chalk.yellow("No skills found across any registries."));
+      console.log(chalk.yellow("No skills found across any collections."));
       console.log(
         chalk.dim(
-          'Run "skillsync init" to discover registries, or create a SKILLS_SYNC.yaml in Google Drive.'
+          'Run "skillsync init" to discover collections, or "skillsync collection create" to create one.'
         )
       );
       return;
@@ -53,7 +53,7 @@ export async function listCommand(): Promise<void> {
       a.entry.name.localeCompare(b.entry.name)
     )) {
       console.log(
-        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`gdrive:${s.registry.name}`)}`
+        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`gdrive:${s.collection.name}`)}`
       );
     }
 

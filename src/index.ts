@@ -10,7 +10,7 @@ import { addCommand } from "./commands/add.js";
 import { updateCommand } from "./commands/update.js";
 import { refreshCommand } from "./commands/refresh.js";
 import { setupGoogleCommand } from "./commands/setup/google.js";
-import { registryCreateCommand } from "./commands/registry.js";
+import { collectionCreateCommand } from "./commands/collection.js";
 
 const supportedAgents = Object.keys(AGENT_PATHS).join(", ");
 
@@ -34,12 +34,12 @@ setup
 
 program
   .command("init")
-  .description("Log into Google Drive and auto-discover registries")
+  .description("Log into Google Drive and auto-discover collections")
   .action(initCommand);
 
 program
   .command("list")
-  .description("Show all available skills across all registries")
+  .description("Show all available skills across all collections")
   .action(listCommand);
 
 program
@@ -60,9 +60,9 @@ program
 
 program
   .command("add <path>")
-  .description("Add a new local skill to a registry")
-  .option("--registry <name>", "Target registry name (default: first)")
-  .action((skillPath: string, options: { registry?: string }) =>
+  .description("Add a new local skill to a collection")
+  .option("--collection <name>", "Target collection name (default: first)")
+  .action((skillPath: string, options: { collection?: string }) =>
     addCommand(skillPath, options)
   );
 
@@ -73,17 +73,17 @@ program
 
 program
   .command("refresh")
-  .description("Re-run registry discovery to pick up new registries")
+  .description("Re-run collection discovery to pick up new collections")
   .action(refreshCommand);
 
-const registry = program
-  .command("registry")
-  .description("Manage registries");
+const collection = program
+  .command("collection")
+  .description("Manage collections");
 
-registry
+collection
   .command("create")
-  .description("Create a new registry (Google Drive folder + SKILLS_SYNC.yaml)")
-  .action(registryCreateCommand);
+  .description("Create a new collection (Google Drive folder + SKILLS_SYNC.yaml)")
+  .action(collectionCreateCommand);
 
 program.parseAsync(process.argv).catch((err: Error) => {
   console.error(chalk.red("Error:"), err.message);

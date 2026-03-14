@@ -1,16 +1,16 @@
-import type { RegistryFile, RegistryInfo } from "../types.js";
+import type { CollectionFile, CollectionInfo } from "../types.js";
 
 export interface StorageBackend {
-  discoverRegistries(): Promise<RegistryInfo[]>;
-  readRegistry(registry: RegistryInfo): Promise<RegistryFile>;
-  writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void>;
+  discoverCollections(): Promise<CollectionInfo[]>;
+  readCollection(collection: CollectionInfo): Promise<CollectionFile>;
+  writeCollection(collection: CollectionInfo, data: CollectionFile): Promise<void>;
   downloadSkill(
-    registry: RegistryInfo,
+    collection: CollectionInfo,
     skillName: string,
     destDir: string
   ): Promise<void>;
   uploadSkill(
-    registry: RegistryInfo,
+    collection: CollectionInfo,
     localPath: string,
     skillName: string
   ): Promise<void>;

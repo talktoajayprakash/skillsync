@@ -13,11 +13,11 @@ export async function updateCommand(name: string): Promise<void> {
   const match = allSkills.find((s) => s.entry.name === name);
 
   if (!match) {
-    console.log(chalk.red(`Skill "${name}" not found in any registry.`));
+    console.log(chalk.red(`Skill "${name}" not found in any collection.`));
     return;
   }
 
-  const cachePath = getCachePath(match.registry, name);
+  const cachePath = getCachePath(match.collection, name);
   if (!fs.existsSync(cachePath)) {
     console.log(
       chalk.red(
@@ -31,14 +31,12 @@ export async function updateCommand(name: string): Promise<void> {
   const backend = new GDriveBackend(auth);
 
   const spinner = ora(
-    `Updating ${chalk.bold(name)} in gdrive:${match.registry.name}...`
+    `Updating ${chalk.bold(name)} in gdrive:${match.collection.name}...`
   ).start();
 
   try {
-    // Upload updated files
-    await backend.uploadSkill(match.registry, cachePath, name);
+    await backend.uploadSkill(match.collection, cachePath, name);
 
-    // Update description in registry if SKILL.md changed
     const skillMdPath = path.join(cachePath, "SKILL.md");
     if (fs.existsSync(skillMdPath)) {
       const content = fs.readFileSync(skillMdPath, "utf-8");
@@ -46,18 +44,18 @@ export async function updateCommand(name: string): Promise<void> {
       if (frontmatterMatch) {
         const frontmatter = YAML.parse(frontmatterMatch[1]);
         if (frontmatter.description) {
-          const reg = await backend.readRegistry(match.registry);
-          const entry = reg.skills.find((s) => s.name === name);
+          const col = await backend.readCollection(match.collection);
+          const entry = col.skills.find((s) => s.name === name);
           if (entry) {
             entry.description = frontmatter.description;
-            await backend.writeRegistry(match.registry, reg);
+            await backend.writeCollection(match.collection, col);
           }
         }
       }
     }
 
     spinner.succeed(
-      `${chalk.bold(name)} updated in gdrive:${match.registry.name}`
+      `${chalk.bold(name)} updated in gdrive:${match.collection.name}`
     );
   } catch (err) {
     spinner.fail(`Failed: ${(err as Error).message}`);

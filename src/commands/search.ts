@@ -36,7 +36,7 @@ export async function searchCommand(query: string): Promise<void> {
       a.entry.name.localeCompare(b.entry.name)
     )) {
       console.log(
-        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`gdrive:${s.registry.name}`)}`
+        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`gdrive:${s.collection.name}`)}`
       );
     }
 

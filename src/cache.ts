@@ -1,16 +1,16 @@
 import fs from "fs";
 import path from "path";
-import { CACHE_DIR, ensureCacheDir } from "./config.js";
+import { CACHE_DIR } from "./config.js";
 import { AGENT_PATHS } from "./types.js";
-import type { RegistryInfo } from "./types.js";
+import type { CollectionInfo } from "./types.js";
 
-export function getCachePath(registry: RegistryInfo, skillName?: string): string {
-  const base = path.join(CACHE_DIR, "gdrive", registry.folderId);
+export function getCachePath(collection: CollectionInfo, skillName?: string): string {
+  const base = path.join(CACHE_DIR, "gdrive", collection.folderId);
   return skillName ? path.join(base, skillName) : base;
 }
 
-export function ensureCachePath(registry: RegistryInfo): string {
-  const p = getCachePath(registry);
+export function ensureCachePath(collection: CollectionInfo): string {
+  const p = getCachePath(collection);
   fs.mkdirSync(p, { recursive: true });
   return p;
 }
@@ -48,8 +48,8 @@ export function createSymlink(
 }
 
 export function skillExistsInCache(
-  registry: RegistryInfo,
+  collection: CollectionInfo,
   skillName: string
 ): boolean {
-  return fs.existsSync(getCachePath(registry, skillName));
+  return fs.existsSync(getCachePath(collection, skillName));
 }

@@ -21,7 +21,12 @@ export function readConfig(): Config {
   if (!fs.existsSync(CONFIG_PATH)) {
     throw new Error(`No config found. Run "skillsync init" first.`);
   }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as Config;
+  const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown>;
+  // Backwards compat: old configs used "registries" key
+  if (raw.registries && !raw.collections) {
+    raw.collections = raw.registries;
+  }
+  return raw as unknown as Config;
 }
 
 export function writeConfig(config: Config): void {

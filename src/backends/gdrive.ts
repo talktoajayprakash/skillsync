@@ -3,7 +3,7 @@ import path from "path";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
 import type { StorageBackend } from "./interface.js";
-import type { RegistryFile, RegistryInfo } from "../types.js";
+import type { CollectionFile, CollectionInfo } from "../types.js";
 import { parseRegistry, serializeRegistry } from "../registry.js";
 import { Readable } from "stream";
 
@@ -17,8 +17,8 @@ export class GDriveBackend implements StorageBackend {
     this.drive = google.drive({ version: "v3", auth });
   }
 
-  async discoverRegistries(): Promise<RegistryInfo[]> {
-    const registries: RegistryInfo[] = [];
+  async discoverCollections(): Promise<CollectionInfo[]> {
+    const collections: CollectionInfo[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -35,13 +35,12 @@ export class GDriveBackend implements StorageBackend {
         const parentId = file.parents?.[0];
         if (!parentId) continue;
 
-        // Get the parent folder name
         const parent = await this.drive.files.get({
           fileId: parentId,
           fields: "id, name",
         });
 
-        registries.push({
+        collections.push({
           name: parent.data.name ?? "unknown",
           backend: "gdrive",
           folderId: parentId,
@@ -50,23 +49,22 @@ export class GDriveBackend implements StorageBackend {
       }
     } while (pageToken);
 
-    return registries;
+    return collections;
   }
 
-  async readRegistry(registry: RegistryInfo): Promise<RegistryFile> {
-    let fileId = registry.registryFileId;
+  async readCollection(collection: CollectionInfo): Promise<CollectionFile> {
+    let fileId = collection.registryFileId;
 
     if (!fileId) {
-      // Find SKILLS_SYNC.yaml in the folder
       const res = await this.drive.files.list({
-        q: `name='${REGISTRY_FILENAME}' and '${registry.folderId}' in parents and trashed=false`,
+        q: `name='${REGISTRY_FILENAME}' and '${collection.folderId}' in parents and trashed=false`,
         fields: "files(id)",
         pageSize: 1,
       });
       fileId = res.data.files?.[0]?.id ?? undefined;
       if (!fileId) {
         throw new Error(
-          `SKILLS_SYNC.yaml not found in registry "${registry.name}"`
+          `SKILLS_SYNC.yaml not found in collection "${collection.name}"`
         );
       }
     }
@@ -79,9 +77,9 @@ export class GDriveBackend implements StorageBackend {
     return parseRegistry(res.data as string);
   }
 
-  async writeRegistry(
-    registry: RegistryInfo,
-    data: RegistryFile
+  async writeCollection(
+    collection: CollectionInfo,
+    data: CollectionFile
   ): Promise<void> {
     const content = serializeRegistry(data);
     const media = {
@@ -89,15 +87,14 @@ export class GDriveBackend implements StorageBackend {
       body: Readable.from(content),
     };
 
-    if (registry.registryFileId) {
+    if (collection.registryFileId) {
       await this.drive.files.update({
-        fileId: registry.registryFileId,
+        fileId: collection.registryFileId,
         media,
       });
     } else {
-      // Find existing or create new
       const res = await this.drive.files.list({
-        q: `name='${REGISTRY_FILENAME}' and '${registry.folderId}' in parents and trashed=false`,
+        q: `name='${REGISTRY_FILENAME}' and '${collection.folderId}' in parents and trashed=false`,
         fields: "files(id)",
         pageSize: 1,
       });
@@ -109,7 +106,7 @@ export class GDriveBackend implements StorageBackend {
         await this.drive.files.create({
           requestBody: {
             name: REGISTRY_FILENAME,
-            parents: [registry.folderId],
+            parents: [collection.folderId],
           },
           media,
         });
@@ -118,13 +115,12 @@ export class GDriveBackend implements StorageBackend {
   }
 
   async downloadSkill(
-    registry: RegistryInfo,
+    collection: CollectionInfo,
     skillName: string,
     destDir: string
   ): Promise<void> {
-    // Find the skill folder in Drive
     const res = await this.drive.files.list({
-      q: `name='${skillName}' and '${registry.folderId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`,
+      q: `name='${skillName}' and '${collection.folderId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`,
       fields: "files(id, name)",
       pageSize: 1,
     });
@@ -132,11 +128,10 @@ export class GDriveBackend implements StorageBackend {
     const skillFolder = res.data.files?.[0];
     if (!skillFolder?.id) {
       throw new Error(
-        `Skill folder "${skillName}" not found in registry "${registry.name}"`
+        `Skill folder "${skillName}" not found in collection "${collection.name}"`
       );
     }
 
-    // Download all files recursively
     await this.downloadFolder(skillFolder.id, destDir);
   }
 
@@ -177,8 +172,7 @@ export class GDriveBackend implements StorageBackend {
     } while (pageToken);
   }
 
-  async createRegistry(folderName: string): Promise<RegistryInfo> {
-    // Create the folder in Drive root
+  async createCollection(folderName: string): Promise<CollectionInfo> {
     const folderRes = await this.drive.files.create({
       requestBody: {
         name: folderName,
@@ -188,9 +182,8 @@ export class GDriveBackend implements StorageBackend {
     });
     const folderId = folderRes.data.id!;
 
-    // Create empty SKILLS_SYNC.yaml inside it
-    const emptyRegistry: RegistryFile = { name: folderName, owner: "", skills: [] };
-    const content = serializeRegistry(emptyRegistry);
+    const emptyCollection: CollectionFile = { name: folderName, owner: "", skills: [] };
+    const content = serializeRegistry(emptyCollection);
     const fileRes = await this.drive.files.create({
       requestBody: {
         name: REGISTRY_FILENAME,
@@ -209,25 +202,23 @@ export class GDriveBackend implements StorageBackend {
   }
 
   async uploadSkill(
-    registry: RegistryInfo,
+    collection: CollectionInfo,
     localPath: string,
     skillName: string
   ): Promise<void> {
-    // Find or create skill folder
-    let folderId = await this.findFolder(skillName, registry.folderId);
+    let folderId = await this.findFolder(skillName, collection.folderId);
     if (!folderId) {
       const res = await this.drive.files.create({
         requestBody: {
           name: skillName,
           mimeType: FOLDER_MIME,
-          parents: [registry.folderId],
+          parents: [collection.folderId],
         },
         fields: "id",
       });
       folderId = res.data.id!;
     }
 
-    // Upload all files from local path
     await this.uploadFolder(localPath, folderId);
   }
 
@@ -267,7 +258,6 @@ export class GDriveBackend implements StorageBackend {
         }
         await this.uploadFolder(fullPath, subFolderId);
       } else {
-        // Check if file already exists
         const existing = await this.drive.files.list({
           q: `name='${entry.name}' and '${parentId}' in parents and trashed=false`,
           fields: "files(id)",
