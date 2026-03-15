@@ -2,7 +2,7 @@ import fs from "fs";
 import readline from "readline";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
-import { TOKEN_PATH, ensureConfigDir, readCredentials } from "./config.js";
+import { TOKEN_PATH, ensureConfigDir, readCredentials, credentialsExist } from "./config.js";
 
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 
@@ -71,4 +71,17 @@ export function getAuthClient(): OAuth2Client {
 
 export function hasToken(): boolean {
   return fs.existsSync(TOKEN_PATH);
+}
+
+export async function ensureAuth(): Promise<OAuth2Client> {
+  if (!credentialsExist()) {
+    throw new Error(
+      "No credentials found. Run: skillsync setup google"
+    );
+  }
+  if (!hasToken()) {
+    console.log("Not authenticated — launching login...\n");
+    return runAuthFlow();
+  }
+  return getAuthClient();
 }

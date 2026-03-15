@@ -1,14 +1,10 @@
 import chalk from "chalk";
 import ora from "ora";
-import { readConfig } from "../config.js";
-import { getAuthClient } from "../auth.js";
-import { GDriveBackend } from "../backends/gdrive.js";
 import type { ResolvedSkill } from "../types.js";
+import { ensureReady } from "../ready.js";
 
 export async function getAllSkills(): Promise<ResolvedSkill[]> {
-  const config = readConfig();
-  const auth = getAuthClient();
-  const backend = new GDriveBackend(auth);
+  const { config, backend } = await ensureReady();
   const allSkills: ResolvedSkill[] = [];
 
   for (const collection of config.collections) {
@@ -32,7 +28,7 @@ export async function listCommand(): Promise<void> {
       console.log(chalk.yellow("No skills found across any collections."));
       console.log(
         chalk.dim(
-          'Run "skillsync init" to discover collections, or "skillsync collection create" to create one.'
+          'Run "skillsync collection create <name>" to create a collection, then "skillsync add <path>" to add skills.'
         )
       );
       return;

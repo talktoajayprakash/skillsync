@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { writeConfig, CONFIG_PATH } from "../config.js";
 import type { Config } from "../types.js";
-import { getAuthClient } from "../auth.js";
+import { ensureAuth } from "../auth.js";
 import { GDriveBackend } from "../backends/gdrive.js";
 import fs from "fs";
 
@@ -13,7 +13,7 @@ export async function collectionCreateCommand(name: string): Promise<void> {
     return;
   }
 
-  const auth = getAuthClient();
+  const auth = await ensureAuth();
   const backend = new GDriveBackend(auth);
   const spinner = ora(`Creating collection "${name}" in Google Drive...`).start();
 
