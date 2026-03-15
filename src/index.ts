@@ -17,9 +17,22 @@ const supportedAgents = Object.keys(AGENT_PATHS).join(", ");
 program
   .name("skillsync")
   .description(
-    "SkillSync — discover, fetch, and manage agent skills from remote storage\n\n" +
-      "Skills are cached at ~/.skillssync/cache/ and symlinked to agent directories.\n" +
-      "All skill names are unique — just use the name, no paths needed."
+    "SkillSync — discover, fetch, and manage agent skills from remote storage.\n\n" +
+    "Common flows:\n\n" +
+    "  Find and install a skill:\n" +
+    "    skillsync search <query>                        # find skills by name or description\n" +
+    "    skillsync fetch <name> --agent <agent>          # download and install for an agent\n\n" +
+    "  Share a new skill:\n" +
+    "    skillsync add <path>                            # upload a local skill directory\n\n" +
+    "  Update a skill you have installed:\n" +
+    "    skillsync update <path>                         # push edits back to remote\n" +
+    "                                                    # (run skillsync fetch first on new machines)\n\n" +
+    "  Supported agents: " + supportedAgents + "\n\n" +
+    "  Skill scope:\n" +
+    "    --scope global   install to ~/.agent/skills/    (default, all projects)\n" +
+    "    --scope project  install to ./.agent/skills/    (this project only)\n\n" +
+    "  First-time setup (human only):\n" +
+    "    skillsync setup google                          # configure Google Drive credentials"
   )
   .version("0.1.0");
 
@@ -29,61 +42,75 @@ const setup = program
 
 setup
   .command("google")
-  .description("Set up Google Drive (installs gcloud, creates project, configures credentials)")
+  .description("One-time Google Drive setup — installs gcloud, creates a Cloud project, and configures OAuth credentials. Human-facing, not for agents.")
   .action(setupGoogleCommand);
 
 program
   .command("init")
-  .description("Log into Google Drive and auto-discover collections")
+  .description("Authenticate with Google Drive and discover available collections. Runs automatically when needed.")
   .action(initCommand);
 
 program
   .command("list")
-  .description("Show all available skills across all collections")
+  .description("List all available skills across all collections with name and description.")
   .action(listCommand);
 
 program
   .command("search <query>")
-  .description("Search skills by name or description")
+  .description("Search skills by name or description. Use this to find the right skill name before fetching.")
   .action(searchCommand);
 
 program
   .command("fetch <names...>")
-  .description("Download a skill and symlink to the agent's skills directory")
-  .requiredOption("--agent <agent>", `Agent to symlink for (${supportedAgents})`)
-  .option("--scope <scope>", "Where to install: global (~/.agent/skills/) or project (.agent/skills/ in cwd)", "global")
+  .description(
+    "Download a skill and install it for an agent via symlink.\n" +
+    "  The skill is cached at ~/.skillssync/cache/ — all symlinks share one copy.\n" +
+    "  Run this on each machine before using or editing a skill.\n" +
+    "  Example: skillsync fetch write_linkedin_post --agent claude"
+  )
+  .requiredOption("--agent <agent>", `Agent to install for (${supportedAgents})`)
+  .option("--scope <scope>", "global = ~/.agent/skills/ (default), project = ./.agent/skills/", "global")
   .action((names: string[], options: { agent: string; scope: "global" | "project" }) =>
     fetchCommand(names, options)
   );
 
 program
   .command("add <path>")
-  .description("Add a new local skill to a collection")
-  .option("--collection <name>", "Target collection name (default: first)")
+  .description(
+    "Upload a local skill directory to a collection.\n" +
+    "  The directory must contain a SKILL.md with name and description frontmatter.\n" +
+    "  Example: skillsync add ./my_skill"
+  )
+  .option("--collection <name>", "Target collection (default: first available)")
   .action((skillPath: string, options: { collection?: string }) =>
     addCommand(skillPath, options)
   );
 
 program
   .command("update <path>")
-  .description("Push local changes to a skill back to remote")
-  .option("--collection <name>", "Override which collection to update")
+  .description(
+    "Push local edits to a skill back to remote storage, then refresh the local cache.\n" +
+    "  All symlinks on this machine reflect the change immediately.\n" +
+    "  Requires the skill to have been fetched on this machine first.\n" +
+    "  Example: skillsync update ~/.claude/skills/write_linkedin_post"
+  )
+  .option("--collection <name>", "Override target collection (needed if skill exists in multiple collections)")
   .action((skillPath: string, options: { collection?: string }) =>
     updateCommand(skillPath, options)
   );
 
 program
   .command("refresh")
-  .description("Re-run collection discovery to pick up new collections")
+  .description("Re-discover collections from Google Drive. Run this if a new collection was created on another machine.")
   .action(refreshCommand);
 
 const collection = program
   .command("collection")
-  .description("Manage collections");
+  .description("Manage collections (Google Drive folders that store skills).");
 
 collection
   .command("create [name]")
-  .description("Create a new collection (Google Drive folder + SKILLS_SYNC.yaml)")
+  .description("Create a new collection. Defaults to SKILLSYNC_MY_SKILLS if no name is given.")
   .action(collectionCreateCommand);
 
 program.parseAsync(process.argv).catch((err: Error) => {

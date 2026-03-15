@@ -353,7 +353,7 @@ describe("update command", () => {
     await updateCommand(localSkillDir, {});
 
     // Should upload to the collection whose installedAt matched localSkillDir
-    const [calledCol] = mockBackend.uploadSkill.mock.calls[0];
+    const [calledCol] = mockBackend.uploadSkill.mock.calls[0] as [{ id: string }, ...unknown[]];
     expect(calledCol.id).toBe(fakeCollection.id);
   });
 
