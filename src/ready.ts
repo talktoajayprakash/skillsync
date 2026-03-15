@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import type { OAuth2Client } from "google-auth-library";
 import { ensureAuth } from "./auth.js";
-import { readConfig, writeConfig, CONFIG_PATH } from "./config.js";
+import { readConfig, writeConfig, mergeCollections, CONFIG_PATH } from "./config.js";
 import { GDriveBackend } from "./backends/gdrive.js";
 import type { Config } from "./types.js";
 import fs from "fs";
@@ -35,7 +35,8 @@ export async function ensureReady(): Promise<ReadyContext> {
   // Auto-discover if no config or no collections
   if (!config || config.collections.length === 0) {
     process.stdout.write(chalk.dim("Discovering collections... "));
-    const collections = await backend.discoverCollections();
+    const fresh = await backend.discoverCollections();
+    const collections = mergeCollections(fresh, config?.collections ?? []);
     config = { collections, discoveredAt: new Date().toISOString() };
     writeConfig(config);
 

@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import { writeConfig } from "../config.js";
+import { writeConfig, mergeCollections, readConfig } from "../config.js";
 import { ensureAuth } from "../auth.js";
 import { GDriveBackend } from "../backends/gdrive.js";
 
@@ -10,7 +10,10 @@ export async function refreshCommand(): Promise<void> {
   try {
     const auth = await ensureAuth();
     const backend = new GDriveBackend(auth);
-    const collections = await backend.discoverCollections();
+    const fresh = await backend.discoverCollections();
+    let existing: import("../types.js").CollectionInfo[] = [];
+    try { existing = readConfig().collections; } catch { /* no existing config */ }
+    const collections = mergeCollections(fresh, existing);
 
     writeConfig({ collections, discoveredAt: new Date().toISOString() });
     spinner.stop();

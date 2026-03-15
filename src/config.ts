@@ -1,7 +1,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { Config } from "./types.js";
+import { randomUUID } from "crypto";
+import type { Config, CollectionInfo } from "./types.js";
 
 export const CONFIG_DIR = path.join(os.homedir(), ".skillssync");
 export const CREDENTIALS_PATH = path.join(CONFIG_DIR, "credentials.json");
@@ -27,6 +28,21 @@ export function readConfig(): Config {
     raw.collections = raw.registries;
   }
   return raw as unknown as Config;
+}
+
+/**
+ * Merges freshly discovered collections with existing ones, preserving UUIDs
+ * for collections already known (matched by folderId). New collections get a
+ * fresh UUID. This keeps cache paths stable across refreshes.
+ */
+export function mergeCollections(
+  fresh: Omit<CollectionInfo, "id">[],
+  existing: CollectionInfo[]
+): CollectionInfo[] {
+  return fresh.map((c) => {
+    const prev = existing.find((e) => e.folderId === c.folderId);
+    return { ...c, id: prev?.id ?? randomUUID() };
+  });
 }
 
 export function writeConfig(config: Config): void {

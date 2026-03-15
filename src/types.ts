@@ -14,6 +14,7 @@ export interface CollectionFile {
 }
 
 export interface CollectionInfo {
+  id: string;           // Stable UUID used for cache path — backend-agnostic
   name: string;
   backend: "gdrive";
   folderId: string;

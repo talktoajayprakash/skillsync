@@ -6,6 +6,7 @@ import type { StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo } from "../types.js";
 import { parseRegistry, serializeRegistry } from "../registry.js";
 import { Readable } from "stream";
+import { randomUUID } from "crypto";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const REGISTRY_FILENAME = "SKILLS_SYNC.yaml";
@@ -24,8 +25,8 @@ export class GDriveBackend implements StorageBackend {
     return res.data.email ?? "";
   }
 
-  async discoverCollections(): Promise<CollectionInfo[]> {
-    const collections: CollectionInfo[] = [];
+  async discoverCollections(): Promise<Omit<CollectionInfo, "id">[]> {
+    const collections: Omit<CollectionInfo, "id">[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -205,6 +206,7 @@ export class GDriveBackend implements StorageBackend {
     });
 
     return {
+      id: randomUUID(),
       name: logicalName,
       backend: "gdrive",
       folderId,
