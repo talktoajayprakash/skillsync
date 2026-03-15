@@ -1,21 +1,15 @@
 import chalk from "chalk";
 import ora from "ora";
-import { getCachePath, createSymlink, ensureCachePath } from "../cache.js";
+import { getCachePath, ensureCachePath, createSymlink, type Scope } from "../cache.js";
 import { ensureReady } from "../ready.js";
 
 export async function fetchCommand(
   names: string[],
-  options: { agent: string }
+  options: { agent: string; scope: Scope }
 ): Promise<void> {
   if (names.length === 0) {
     console.log(chalk.red("Please specify at least one skill name."));
-    console.log(chalk.dim('  Example: skillsync fetch pdf-skill --agent claude'));
-    return;
-  }
-
-  if (!options.agent) {
-    console.log(chalk.red("Please specify an agent with --agent."));
-    console.log(chalk.dim('  Example: skillsync fetch pdf-skill --agent claude'));
+    console.log(chalk.dim("  Example: skillsync fetch pdf-skill --agent claude"));
     return;
   }
 
@@ -29,6 +23,9 @@ export async function fetchCommand(
       allSkills.push({ entry, collection });
     }
   }
+
+  const scope = options.scope ?? "global";
+  const cwd = process.cwd();
 
   for (const name of names) {
     const match = allSkills.find((s) => s.entry.name === name);
@@ -44,9 +41,15 @@ export async function fetchCommand(
       const cachePath = getCachePath(match.collection, name);
 
       await backend.downloadSkill(match.collection, name, cachePath);
-      createSymlink(name, cachePath, options.agent);
+      const { skillsDir, created } = createSymlink(name, cachePath, options.agent, scope, cwd);
 
-      spinner.succeed(`${chalk.bold(name)} → symlinked to ${options.agent}`);
+      spinner.succeed(
+        `${chalk.bold(name)} → ${scope === "project" ? "project" : "global"} ${options.agent} skills`
+      );
+
+      if (created) {
+        console.log(chalk.dim(`  Created ${skillsDir}`));
+      }
     } catch (err) {
       spinner.fail(`${chalk.bold(name)}: ${(err as Error).message}`);
     }

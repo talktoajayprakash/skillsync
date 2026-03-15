@@ -15,24 +15,53 @@ export function ensureCachePath(collection: CollectionInfo): string {
   return p;
 }
 
+export type Scope = "global" | "project";
+
+/**
+ * Returns the symlink target directory for the given agent and scope.
+ * - global: ~/.agent/skills/  (from AGENT_PATHS)
+ * - project: <cwd>/.agent/skills/
+ *
+ * Also returns whether the directory had to be created, so the caller
+ * can print a transparent message to the user.
+ */
+export function resolveSkillsDir(
+  agentName: string,
+  scope: Scope,
+  cwd: string
+): { skillsDir: string; created: boolean } {
+  if (!AGENT_PATHS[agentName]) {
+    const supported = Object.keys(AGENT_PATHS).join(", ");
+    throw new Error(`Unknown agent "${agentName}". Supported agents: ${supported}`);
+  }
+
+  let skillsDir: string;
+  if (scope === "project") {
+    // Derive the agent subfolder name from the global path (e.g. ".claude/skills")
+    const globalDir = AGENT_PATHS[agentName];
+    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+    const relative = path.relative(home, globalDir); // e.g. ".claude/skills"
+    skillsDir = path.join(cwd, relative);
+  } else {
+    skillsDir = AGENT_PATHS[agentName];
+  }
+
+  const existed = fs.existsSync(skillsDir);
+  fs.mkdirSync(skillsDir, { recursive: true });
+  return { skillsDir, created: !existed };
+}
+
 export function createSymlink(
   skillName: string,
   cachePath: string,
-  agentName: string
-): void {
-  const agentDir = AGENT_PATHS[agentName];
-  if (!agentDir) {
-    const supported = Object.keys(AGENT_PATHS).join(", ");
-    throw new Error(
-      `Unknown agent "${agentName}". Supported agents: ${supported}`
-    );
-  }
+  agentName: string,
+  scope: Scope = "global",
+  cwd: string = process.cwd()
+): { skillsDir: string; created: boolean } {
+  const { skillsDir, created } = resolveSkillsDir(agentName, scope, cwd);
 
-  fs.mkdirSync(agentDir, { recursive: true });
+  const linkPath = path.join(skillsDir, skillName);
 
-  const linkPath = path.join(agentDir, skillName);
-
-  // Remove existing symlink or directory
   if (fs.existsSync(linkPath)) {
     const stat = fs.lstatSync(linkPath);
     if (stat.isSymbolicLink()) {
@@ -45,6 +74,7 @@ export function createSymlink(
   }
 
   fs.symlinkSync(cachePath, linkPath);
+  return { skillsDir, created };
 }
 
 export function skillExistsInCache(

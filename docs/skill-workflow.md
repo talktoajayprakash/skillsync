@@ -36,9 +36,9 @@ Skill "my-skill" not found in .claude/skills/ or ~/.claude/skills/
 
 **Collection:** defaults to first configured collection, `--collection` flag to override.
 
-### Open questions
-- [ ] If skill exists in both project and global, should we warn or silently prefer project?
-- [ ] Should we walk all agent paths or only the one specified with `--agent`?
+### Decision
+- `add` stays path-based. The agent always provides the full path.
+  No name resolution needed — removes ambiguity entirely.
 
 ---
 
@@ -83,11 +83,11 @@ skillsync fetch my-skill --agent claude --scope global
 skillsync fetch my-skill --agent claude --scope project
 ```
 
-### Open questions
-- [ ] If `--scope project` is used but cwd has no `.claude/` dir at all,
-      should we warn the user before creating it?
-- [ ] Should we record what scope was used somewhere (e.g. in the symlink
-      metadata or a local config) so `skillsync update` knows where to look?
+### Decisions
+- If `--scope project` is used and `.claude/skills/` does not exist in cwd,
+  create it silently and print a message so the caller agent and user know:
+  `Created .claude/skills/ in current directory`
+  Transparency matters — the agent should know what happened.
 
 ---
 

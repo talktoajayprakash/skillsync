@@ -50,11 +50,9 @@ program
 program
   .command("fetch <names...>")
   .description("Download a skill and symlink to the agent's skills directory")
-  .requiredOption(
-    "--agent <agent>",
-    `Agent to symlink for (${supportedAgents})`
-  )
-  .action((names: string[], options: { agent: string }) =>
+  .requiredOption("--agent <agent>", `Agent to symlink for (${supportedAgents})`)
+  .option("--scope <scope>", "Where to install: global (~/.agent/skills/) or project (.agent/skills/ in cwd)", "global")
+  .action((names: string[], options: { agent: string; scope: "global" | "project" }) =>
     fetchCommand(names, options)
   );
 
