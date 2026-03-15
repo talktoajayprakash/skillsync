@@ -6,20 +6,23 @@ import { ensureAuth } from "../auth.js";
 import { GDriveBackend } from "../backends/gdrive.js";
 import fs from "fs";
 
-export async function collectionCreateCommand(name: string): Promise<void> {
-  if (!name) {
-    console.log(chalk.red("Please provide a collection name."));
-    console.log(chalk.dim("  Usage: skillsync collection create <name>"));
-    return;
-  }
-
+export async function collectionCreateCommand(name?: string): Promise<void> {
   const auth = await ensureAuth();
   const backend = new GDriveBackend(auth);
-  const spinner = ora(`Creating collection "${name}" in Google Drive...`).start();
+
+  // Default to "<first name>'s skills" derived from the user's Google account
+  let folderName = name;
+  if (!folderName) {
+    const email = await backend.getOwnerEmail();
+    const firstName = email.split("@")[0].split(".")[0];
+    folderName = `${firstName}'s skills`;
+  }
+
+  const spinner = ora(`Creating collection "${folderName}" in Google Drive...`).start();
 
   try {
-    const collection = await backend.createCollection(name);
-    spinner.succeed(`Collection "${name}" created in Google Drive`);
+    const collection = await backend.createCollection(folderName);
+    spinner.succeed(`Collection "${folderName}" created in Google Drive`);
 
     let config: Config = { collections: [], discoveredAt: new Date().toISOString() };
     if (fs.existsSync(CONFIG_PATH)) {
