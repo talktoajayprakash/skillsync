@@ -10,12 +10,12 @@ export async function collectionCreateCommand(name?: string): Promise<void> {
   const auth = await ensureAuth();
   const backend = new GDriveBackend(auth);
 
-  // Default to "<first name>'s skills" derived from the user's Google account
-  let folderName = name;
-  if (!folderName) {
-    const email = await backend.getOwnerEmail();
-    const firstName = email.split("@")[0].split(".")[0];
-    folderName = `${firstName}'s skills`;
+  const PREFIX = "SKILLSYNC_";
+  let folderName: string;
+  if (!name) {
+    folderName = `${PREFIX}MY_SKILLS`;
+  } else {
+    folderName = name.startsWith(PREFIX) ? name : `${PREFIX}${name}`;
   }
 
   const spinner = ora(`Creating collection "${folderName}" in Google Drive...`).start();
