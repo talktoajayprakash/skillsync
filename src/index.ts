@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import chalk from "chalk";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { program } from "commander";
 import { AGENT_PATHS } from "./types.js";
 import { initCommand } from "./commands/init.js";
@@ -19,23 +22,19 @@ import {
 
 const supportedAgents = Object.keys(AGENT_PATHS).join(", ");
 
+// Read the bundled SKILL.md as the CLI help — single source of truth
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const skillMdPath = path.resolve(__dirname, "..", "skills", "skillsync", "SKILL.md");
+let helpText = "Discover, fetch, and manage agent skills from local or remote storage.";
+try {
+  const raw = fs.readFileSync(skillMdPath, "utf-8");
+  // Strip YAML frontmatter
+  helpText = raw.replace(/^---\n[\s\S]*?\n---\n*/, "").trim();
+} catch { /* use fallback */ }
+
 program
   .name("skillsync")
-  .description(
-    "Discover, fetch, and manage agent skills from local or remote storage.\n\n" +
-    "  skillsync search <query>                        Search skills by name or description\n" +
-    "  skillsync fetch <name> --agent <agent>          Download and install a skill\n" +
-    "  skillsync add <path>                            Upload a local skill to a collection\n" +
-    "  skillsync update <path>                         Push local edits back to storage\n" +
-    "  skillsync list                                  List all available skills\n" +
-    "  skillsync registry list                         Show registries and collections\n" +
-    "  skillsync registry push --backend gdrive        Push local data to Google Drive\n" +
-    "  skillsync install                               Install skillsync skill for all agents\n\n" +
-    "  Agents: " + supportedAgents + "\n" +
-    "  Scope:  --scope global (default) | --scope project\n\n" +
-    "  Run 'skillsync install' to install the full skillsync guide for your agents.\n" +
-    "  Run 'skillsync <command> --help' for details on any command."
-  )
+  .description(helpText)
   .version("0.1.0");
 
 // ── Setup ────────────────────────────────────────────────────────────────────
