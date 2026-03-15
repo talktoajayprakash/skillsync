@@ -16,9 +16,31 @@ export interface CollectionFile {
 export interface CollectionInfo {
   id: string;           // Stable UUID used for cache path — backend-agnostic
   name: string;
-  backend: "gdrive";
-  folderId: string;
-  registryFileId?: string; // Drive file ID of SKILLS_SYNC.yaml
+  backend: string;      // "local" | "gdrive" | "github" — string for extensibility
+  folderId: string;     // backend-specific location identifier
+  registryFileId?: string; // backend-specific file ID of SKILLSYNC_COLLECTION.yaml
+  sourceRegistryId?: string; // UUID of the registry that discovered this collection
+}
+
+export interface RegistryCollectionRef {
+  name: string;
+  backend: string;      // "local" | "gdrive" | "github"
+  ref: string;          // backend-specific identifier (folder name, repo path, etc.)
+}
+
+export interface RegistryFile {
+  name: string;
+  owner: string;
+  source: string;       // where the registry itself is stored: "local" | "gdrive" | "github"
+  collections: RegistryCollectionRef[];
+}
+
+export interface RegistryInfo {
+  id: string;           // stable UUID (assigned by config layer)
+  name: string;
+  backend: string;
+  folderId: string;     // backend-specific location of the registry
+  fileId?: string;      // backend-specific file ID of SKILLSYNC_REGISTRY.yaml
 }
 
 export interface SkillLocation {
@@ -31,6 +53,7 @@ export interface SkillIndex {
 }
 
 export interface Config {
+  registries: RegistryInfo[];
   collections: CollectionInfo[];
   skills: SkillIndex;
   discoveredAt: string;

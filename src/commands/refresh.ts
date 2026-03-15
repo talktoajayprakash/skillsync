@@ -16,7 +16,8 @@ export async function refreshCommand(): Promise<void> {
     const collections = mergeCollections(fresh, existing);
 
     let existingSkills = {}; try { existingSkills = readConfig().skills ?? {}; } catch { /* ok */ }
-  writeConfig({ collections, skills: existingSkills, discoveredAt: new Date().toISOString() });
+    let existingRegistries: import("../types.js").RegistryInfo[] = []; try { existingRegistries = readConfig().registries ?? []; } catch { /* ok */ }
+    writeConfig({ registries: existingRegistries, collections, skills: existingSkills, discoveredAt: new Date().toISOString() });
     spinner.stop();
 
     if (collections.length === 0) {

@@ -37,7 +37,7 @@ export async function ensureReady(): Promise<ReadyContext> {
     process.stdout.write(chalk.dim("Discovering collections... "));
     const fresh = await backend.discoverCollections();
     const collections = mergeCollections(fresh, config?.collections ?? []);
-    config = { collections, skills: config?.skills ?? {}, discoveredAt: new Date().toISOString() };
+    config = { registries: config?.registries ?? [], collections, skills: config?.skills ?? {}, discoveredAt: new Date().toISOString() };
     writeConfig(config);
 
     if (collections.length === 0) {

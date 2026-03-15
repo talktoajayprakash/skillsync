@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
-import type { Config, CollectionInfo, SkillLocation } from "./types.js";
+import type { Config, CollectionInfo, RegistryInfo, SkillLocation } from "./types.js";
 
 export const CONFIG_DIR = path.join(os.homedir(), ".skillssync");
 export const CREDENTIALS_PATH = path.join(CONFIG_DIR, "credentials.json");
@@ -23,13 +23,20 @@ export function readConfig(): Config {
     throw new Error(`No config found. Run "skillsync init" first.`);
   }
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown>;
-  // Backwards compat: old configs used "registries" key
-  if (raw.registries && !raw.collections) {
+  // Backwards compat: very old configs used "registries" key for collections
+  if (raw.registries && !raw.collections && Array.isArray(raw.registries) && (raw.registries as unknown[]).length > 0 && (raw.registries as Record<string, unknown>[])[0].folderId) {
+    // Old format: registries was actually collections
     raw.collections = raw.registries;
+    raw.registries = [];
   }
+  let needsWrite = false;
+  // Backwards compat: ensure registries array exists
+  if (!raw.registries || !Array.isArray(raw.registries)) { raw.registries = []; needsWrite = true; }
+  // Backfill UUIDs on registries
+  const registries = raw.registries as RegistryInfo[];
+  registries.forEach((r) => { if (!r.id) { r.id = randomUUID(); needsWrite = true; } });
   // Backwards compat: assign stable UUIDs to collections missing an id
   const collections = raw.collections as CollectionInfo[];
-  let needsWrite = false;
   if (Array.isArray(collections)) {
     collections.forEach((c) => { if (!c.id) { c.id = randomUUID(); needsWrite = true; } });
   }
@@ -65,9 +72,23 @@ export function mergeCollections(
   });
 }
 
+/**
+ * Merges freshly discovered registries with existing ones, preserving UUIDs
+ * for registries already known (matched by folderId).
+ */
+export function mergeRegistries(
+  fresh: Omit<RegistryInfo, "id">[],
+  existing: RegistryInfo[]
+): RegistryInfo[] {
+  return fresh.map((r) => {
+    const prev = existing.find((e) => e.folderId === r.folderId);
+    return { ...r, id: prev?.id ?? randomUUID() };
+  });
+}
+
 export function trackSkill(skillName: string, collectionId: string, installedPath?: string): void {
   let config: Config;
-  try { config = readConfig(); } catch { config = { collections: [], skills: {}, discoveredAt: new Date().toISOString() }; }
+  try { config = readConfig(); } catch { config = { registries: [], collections: [], skills: {}, discoveredAt: new Date().toISOString() }; }
   if (!config.skills) config.skills = {};
 
   const entries: SkillLocation[] = config.skills[skillName] ?? [];

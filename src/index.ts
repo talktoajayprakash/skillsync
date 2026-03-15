@@ -12,6 +12,10 @@ import { refreshCommand } from "./commands/refresh.js";
 import { setupGoogleCommand } from "./commands/setup/google.js";
 import { collectionCreateCommand } from "./commands/collection.js";
 import { installCommand, uninstallCommand } from "./commands/install.js";
+import {
+  registryCreateCommand, registryListCommand, registryDiscoverCommand,
+  registryAddCollectionCommand, registryPushCommand,
+} from "./commands/registry.js";
 
 const supportedAgents = Object.keys(AGENT_PATHS).join(", ");
 
@@ -144,6 +148,42 @@ program
   .action((options: { agent?: string; path?: string }) =>
     uninstallCommand(options)
   );
+
+const registry = program
+  .command("registry")
+  .description("Manage registries (root indexes that point to collections across backends).");
+
+registry
+  .command("create")
+  .description("Create a new registry. Defaults to local storage.")
+  .option("--backend <backend>", "Backend to create in: local (default) or gdrive", "local")
+  .action((options: { backend?: string }) => registryCreateCommand(options));
+
+registry
+  .command("list")
+  .description("Show all registries and their collection references.")
+  .action(registryListCommand);
+
+registry
+  .command("discover")
+  .description("Search a backend for registries owned by the current user.")
+  .option("--backend <backend>", "Backend to search: local (default) or gdrive", "local")
+  .action((options: { backend?: string }) => registryDiscoverCommand(options));
+
+registry
+  .command("add-collection <name>")
+  .description("Add a collection reference to the first registry.")
+  .option("--backend <backend>", "Backend where the collection lives")
+  .option("--ref <ref>", "Backend-specific reference (folder name, repo path)")
+  .action((name: string, options: { backend?: string; ref?: string }) =>
+    registryAddCollectionCommand(name, options)
+  );
+
+registry
+  .command("push")
+  .description("Push local registry and collections to a remote backend.")
+  .option("--backend <backend>", "Target backend: gdrive (default)", "gdrive")
+  .action((options: { backend?: string }) => registryPushCommand(options));
 
 program.parseAsync(process.argv).catch((err: Error) => {
   console.error(chalk.red("Error:"), err.message);

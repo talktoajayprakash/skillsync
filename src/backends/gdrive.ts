@@ -3,13 +3,16 @@ import path from "path";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
 import type { StorageBackend } from "./interface.js";
-import type { CollectionFile, CollectionInfo } from "../types.js";
-import { parseRegistry, serializeRegistry } from "../registry.js";
+import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
+import {
+  parseCollection, serializeCollection,
+  parseRegistryFile, serializeRegistryFile,
+  COLLECTION_FILENAME, LEGACY_COLLECTION_FILENAME, REGISTRY_FILENAME,
+} from "../registry.js";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
-const REGISTRY_FILENAME = "SKILLS_SYNC.yaml";
 
 export class GDriveBackend implements StorageBackend {
   private drive: ReturnType<typeof google.drive>;
@@ -25,13 +28,15 @@ export class GDriveBackend implements StorageBackend {
     return res.data.email ?? "";
   }
 
+  // ── Collection operations ────────────────────────────────────────────────
+
   async discoverCollections(): Promise<Omit<CollectionInfo, "id">[]> {
     const collections: Omit<CollectionInfo, "id">[] = [];
     let pageToken: string | undefined;
 
     do {
       const res = await this.drive.files.list({
-        q: `name='${REGISTRY_FILENAME}' and 'me' in owners and trashed=false`,
+        q: `(name='${COLLECTION_FILENAME}' or name='${LEGACY_COLLECTION_FILENAME}') and 'me' in owners and trashed=false`,
         fields: "nextPageToken, files(id, name, parents)",
         pageSize: 100,
         ...(pageToken ? { pageToken } : {}),
@@ -65,15 +70,19 @@ export class GDriveBackend implements StorageBackend {
     let fileId = collection.registryFileId;
 
     if (!fileId) {
-      const res = await this.drive.files.list({
-        q: `name='${REGISTRY_FILENAME}' and '${collection.folderId}' in parents and trashed=false`,
-        fields: "files(id)",
-        pageSize: 1,
-      });
-      fileId = res.data.files?.[0]?.id ?? undefined;
+      // Try new filename first, fall back to legacy
+      for (const filename of [COLLECTION_FILENAME, LEGACY_COLLECTION_FILENAME]) {
+        const res = await this.drive.files.list({
+          q: `name='${filename}' and '${collection.folderId}' in parents and trashed=false`,
+          fields: "files(id)",
+          pageSize: 1,
+        });
+        fileId = res.data.files?.[0]?.id ?? undefined;
+        if (fileId) break;
+      }
       if (!fileId) {
         throw new Error(
-          `SKILLS_SYNC.yaml not found in collection "${collection.name}"`
+          `Collection file not found in "${collection.name}"`
         );
       }
     }
@@ -83,14 +92,14 @@ export class GDriveBackend implements StorageBackend {
       { responseType: "text" }
     );
 
-    return parseRegistry(res.data as string);
+    return parseCollection(res.data as string);
   }
 
   async writeCollection(
     collection: CollectionInfo,
     data: CollectionFile
   ): Promise<void> {
-    const content = serializeRegistry(data);
+    const content = serializeCollection(data);
     const media = {
       mimeType: "text/yaml",
       body: Readable.from(content),
@@ -102,19 +111,24 @@ export class GDriveBackend implements StorageBackend {
         media,
       });
     } else {
-      const res = await this.drive.files.list({
-        q: `name='${REGISTRY_FILENAME}' and '${collection.folderId}' in parents and trashed=false`,
-        fields: "files(id)",
-        pageSize: 1,
-      });
+      // Try to find existing file (new or legacy name)
+      let existingId: string | undefined;
+      for (const filename of [COLLECTION_FILENAME, LEGACY_COLLECTION_FILENAME]) {
+        const res = await this.drive.files.list({
+          q: `name='${filename}' and '${collection.folderId}' in parents and trashed=false`,
+          fields: "files(id)",
+          pageSize: 1,
+        });
+        existingId = res.data.files?.[0]?.id ?? undefined;
+        if (existingId) break;
+      }
 
-      const existingId = res.data.files?.[0]?.id;
       if (existingId) {
         await this.drive.files.update({ fileId: existingId, media });
       } else {
         await this.drive.files.create({
           requestBody: {
-            name: REGISTRY_FILENAME,
+            name: COLLECTION_FILENAME,
             parents: [collection.folderId],
           },
           media,
@@ -192,13 +206,12 @@ export class GDriveBackend implements StorageBackend {
     const folderId = folderRes.data.id!;
 
     const owner = await this.getOwnerEmail();
-    // Strip the SKILLSYNC_ prefix for the logical name stored in the YAML
     const logicalName = folderName.replace(/^SKILLSYNC_/i, "");
     const emptyCollection: CollectionFile = { name: logicalName, owner, skills: [] };
-    const content = serializeRegistry(emptyCollection);
+    const content = serializeCollection(emptyCollection);
     const fileRes = await this.drive.files.create({
       requestBody: {
-        name: REGISTRY_FILENAME,
+        name: COLLECTION_FILENAME,
         parents: [folderId],
       },
       media: { mimeType: "text/yaml", body: Readable.from(content) },
@@ -234,6 +247,150 @@ export class GDriveBackend implements StorageBackend {
 
     await this.uploadFolder(localPath, folderId);
   }
+
+  // ── Registry operations ──────────────────────────────────────────────────
+
+  async discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]> {
+    const registries: Omit<RegistryInfo, "id">[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const res = await this.drive.files.list({
+        q: `name='${REGISTRY_FILENAME}' and 'me' in owners and trashed=false`,
+        fields: "nextPageToken, files(id, name, parents)",
+        pageSize: 100,
+        ...(pageToken ? { pageToken } : {}),
+      });
+
+      pageToken = res.data.nextPageToken ?? undefined;
+
+      for (const file of res.data.files ?? []) {
+        const parentId = file.parents?.[0];
+        if (!parentId) continue;
+
+        const parent = await this.drive.files.get({
+          fileId: parentId,
+          fields: "id, name",
+        });
+
+        registries.push({
+          name: (parent.data.name ?? "unknown").replace(/^SKILLSYNC_/i, ""),
+          backend: "gdrive",
+          folderId: parentId,
+          fileId: file.id ?? undefined,
+        });
+      }
+    } while (pageToken);
+
+    return registries;
+  }
+
+  async readRegistry(registry: RegistryInfo): Promise<RegistryFile> {
+    let fileId = registry.fileId;
+
+    if (!fileId) {
+      const res = await this.drive.files.list({
+        q: `name='${REGISTRY_FILENAME}' and '${registry.folderId}' in parents and trashed=false`,
+        fields: "files(id)",
+        pageSize: 1,
+      });
+      fileId = res.data.files?.[0]?.id ?? undefined;
+      if (!fileId) {
+        throw new Error(`Registry file not found for "${registry.name}"`);
+      }
+    }
+
+    const res = await this.drive.files.get(
+      { fileId, alt: "media" },
+      { responseType: "text" }
+    );
+
+    return parseRegistryFile(res.data as string);
+  }
+
+  async writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void> {
+    const content = serializeRegistryFile(data);
+    const media = { mimeType: "text/yaml", body: Readable.from(content) };
+
+    if (registry.fileId) {
+      await this.drive.files.update({ fileId: registry.fileId, media });
+    } else {
+      const res = await this.drive.files.list({
+        q: `name='${REGISTRY_FILENAME}' and '${registry.folderId}' in parents and trashed=false`,
+        fields: "files(id)",
+        pageSize: 1,
+      });
+      const existingId = res.data.files?.[0]?.id;
+      if (existingId) {
+        await this.drive.files.update({ fileId: existingId, media });
+      } else {
+        await this.drive.files.create({
+          requestBody: { name: REGISTRY_FILENAME, parents: [registry.folderId] },
+          media,
+        });
+      }
+    }
+  }
+
+  async resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id"> | null> {
+    if (ref.backend !== "gdrive") return null;
+
+    // Search for folder by name (try with SKILLSYNC_ prefix and without)
+    const names = ref.ref.startsWith("SKILLSYNC_") ? [ref.ref] : [`SKILLSYNC_${ref.ref}`, ref.ref];
+
+    for (const name of names) {
+      const res = await this.drive.files.list({
+        q: `name='${name}' and mimeType='${FOLDER_MIME}' and 'me' in owners and trashed=false`,
+        fields: "files(id, name)",
+        pageSize: 1,
+      });
+
+      const folder = res.data.files?.[0];
+      if (folder?.id) {
+        return {
+          name: (folder.name ?? name).replace(/^SKILLSYNC_/i, ""),
+          backend: "gdrive",
+          folderId: folder.id,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  async createRegistry(name?: string): Promise<RegistryInfo> {
+    const folderName = name ? `SKILLSYNC_REGISTRY_${name}` : "SKILLSYNC_REGISTRY";
+
+    const folderRes = await this.drive.files.create({
+      requestBody: { name: folderName, mimeType: FOLDER_MIME },
+      fields: "id, name",
+    });
+    const folderId = folderRes.data.id!;
+
+    const owner = await this.getOwnerEmail();
+    const registryData: RegistryFile = {
+      name: name ?? "default",
+      owner,
+      source: "gdrive",
+      collections: [],
+    };
+
+    const fileRes = await this.drive.files.create({
+      requestBody: { name: REGISTRY_FILENAME, parents: [folderId] },
+      media: { mimeType: "text/yaml", body: Readable.from(serializeRegistryFile(registryData)) },
+      fields: "id",
+    });
+
+    return {
+      id: randomUUID(),
+      name: name ?? "default",
+      backend: "gdrive",
+      folderId,
+      fileId: fileRes.data.id ?? undefined,
+    };
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────────────
 
   private async findFolder(
     name: string,
