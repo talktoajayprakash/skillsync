@@ -1,6 +1,9 @@
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 
 export interface StorageBackend {
+  // ── Identity ───────────────────────────────────────────────────────────────
+  getOwner(): Promise<string>; // identity of the authenticated user (email, username, etc.)
+
   // ── Collection operations (existing) ─────────────────────────────────────
   discoverCollections(): Promise<Omit<CollectionInfo, "id">[]>;
   readCollection(collection: CollectionInfo): Promise<CollectionFile>;

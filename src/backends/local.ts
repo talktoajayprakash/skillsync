@@ -18,6 +18,17 @@ const LOCAL_REGISTRY_PATH = path.join(CONFIG_DIR, "registry.yaml");
  * Works with zero setup, no auth, no internet. This is the default backend.
  */
 export class LocalBackend implements StorageBackend {
+  // ── Identity ─────────────────────────────────────────────────────────────
+
+  async getOwner(): Promise<string> {
+    // Try to read from existing registry first
+    if (fs.existsSync(LOCAL_REGISTRY_PATH)) {
+      const data = parseRegistryFile(fs.readFileSync(LOCAL_REGISTRY_PATH, "utf-8"));
+      if (data.owner) return data.owner;
+    }
+    return process.env.USER ?? process.env.USERNAME ?? "unknown";
+  }
+
   // ── Collection operations ────────────────────────────────────────────────
 
   async discoverCollections(): Promise<Omit<CollectionInfo, "id">[]> {
@@ -123,7 +134,7 @@ export class LocalBackend implements StorageBackend {
 
   async createRegistry(name?: string): Promise<RegistryInfo> {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
-    const owner = process.env.USER ?? process.env.USERNAME ?? "unknown";
+    const owner = await this.getOwner();
     const data: RegistryFile = {
       name: name ?? "local",
       owner,
@@ -145,7 +156,7 @@ export class LocalBackend implements StorageBackend {
   async createCollection(name: string): Promise<CollectionInfo> {
     const dir = path.join(COLLECTIONS_DIR, name);
     fs.mkdirSync(dir, { recursive: true });
-    const owner = process.env.USER ?? process.env.USERNAME ?? "unknown";
+    const owner = await this.getOwner();
     const data: CollectionFile = { name, owner, skills: [] };
     fs.writeFileSync(path.join(dir, COLLECTION_FILENAME), serializeCollection(data));
     return {

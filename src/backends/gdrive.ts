@@ -23,9 +23,14 @@ export class GDriveBackend implements StorageBackend {
     this.oauth2 = google.oauth2({ version: "v2", auth });
   }
 
-  async getOwnerEmail(): Promise<string> {
+  async getOwner(): Promise<string> {
     const res = await this.oauth2.userinfo.get();
     return res.data.email ?? "";
+  }
+
+  // Alias for backwards compat
+  async getOwnerEmail(): Promise<string> {
+    return this.getOwner();
   }
 
   // ── Collection operations ────────────────────────────────────────────────
