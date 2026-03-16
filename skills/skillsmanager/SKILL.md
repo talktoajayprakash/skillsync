@@ -31,7 +31,7 @@ skillsmanager fetch <name> --agent <agent> --scope project
 skillsmanager list
 ```
 
-Supported agents: `claude`, `codex`, `agents`, `cursor`, `windsurf`, `copilot`, `gemini`, `roo`
+Supported agents: `claude`, `codex`, `agents`, `cursor`, `windsurf`, `copilot`, `gemini`, `roo`, `openclaw`
 
 ### Share a skill
 
