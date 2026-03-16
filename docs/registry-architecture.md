@@ -211,3 +211,47 @@ skillsmanager search <query>                     # search across all collections
 | Config missing `registries` field | Backfilled to `[]` |
 | Mix of local + remote collections | Both appear in unified skill list |
 | Remote registry with `backend: local` refs | Should not exist — `registry push` prevents this |
+
+## References
+
+### Agent Skills Standard
+
+- [Agent Skills Open Standard](https://agentskills.io/home) — the open format for giving agents new capabilities
+- [Specification](https://agentskills.io/specification) — complete SKILL.md format specification
+- [Example skills](https://github.com/anthropics/skills) — official example skills
+- [Reference library](https://github.com/agentskills/agentskills/tree/main/skills-ref) — validate skills and generate prompt XML
+
+### Agent-Specific Skills Documentation
+
+| Agent | Skills Docs | Source |
+|---|---|---|
+| Claude Code | [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills) | |
+| Claude | [platform.claude.com/docs/en/agents-and-tools/agent-skills/overview](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) | |
+| OpenAI Codex | [developers.openai.com/codex/skills](https://developers.openai.com/codex/skills/) | [GitHub](https://github.com/openai/codex) |
+| Cursor | [cursor.com/docs/context/skills](https://cursor.com/docs/context/skills) | |
+| GitHub Copilot | [docs.github.com/en/copilot/concepts/agents/about-agent-skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) | [GitHub](https://github.com/microsoft/vscode-copilot-chat) |
+| VS Code | [code.visualstudio.com/docs/copilot/customization/agent-skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills) | [GitHub](https://github.com/microsoft/vscode) |
+| Gemini CLI | [geminicli.com/docs/cli/skills](https://geminicli.com/docs/cli/skills/) | [GitHub](https://github.com/google-gemini/gemini-cli) |
+| Antigravity | [antigravity.google/docs/get-started](https://antigravity.google/docs/get-started) | |
+| OpenClaw | [docs.openclaw.ai/tools/skills](https://docs.openclaw.ai/tools/skills.md) | |
+| Roo Code | [docs.roocode.com/features/skills](https://docs.roocode.com/features/skills) | [GitHub](https://github.com/RooCodeInc/Roo-Code) |
+| Windsurf | [codeium.com](https://codeium.com) | |
+| Goose | [block.github.io/goose/docs/guides/context-engineering/using-skills](https://block.github.io/goose/docs/guides/context-engineering/using-skills/) | [GitHub](https://github.com/block/goose) |
+| JetBrains Junie | [junie.jetbrains.com/docs/agent-skills](https://junie.jetbrains.com/docs/agent-skills.html) | |
+| Amp | [ampcode.com/manual#agent-skills](https://ampcode.com/manual#agent-skills) | |
+| Databricks | [docs.snowflake.com/en/user-guide/cortex-code/extensibility](https://docs.databricks.com/aws/en/assistant/skills) | |
+
+### Supported Agent Skill Directories
+
+| Agent | Global path |
+|---|---|
+| claude | `~/.claude/skills/` |
+| codex | `~/.codex/skills/` |
+| agents | `~/.agents/skills/` |
+| cursor | `~/.cursor/skills/` |
+| windsurf | `~/.codeium/windsurf/skills/` |
+| copilot | `~/.copilot/skills/` |
+| gemini | `~/.gemini/skills/` |
+| roo | `~/.roo/skills/` |
+| openclaw | `~/.openclaw/skills/` |
+| antigravity | `~/.gemini/antigravity/skills/` |
