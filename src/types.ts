@@ -76,4 +76,5 @@ export const AGENT_PATHS: Record<string, string> = {
   gemini: path.join(os.homedir(), ".gemini", "skills"),
   roo: path.join(os.homedir(), ".roo", "skills"),
   openclaw: path.join(os.homedir(), ".openclaw", "skills"),
+  antigravity: path.join(os.homedir(), ".gemini", "antigravity", "skills"),
 };
