@@ -16,16 +16,14 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 export class GDriveBackend implements StorageBackend {
   private drive: ReturnType<typeof google.drive>;
-  private oauth2: ReturnType<typeof google.oauth2>;
 
   constructor(auth: OAuth2Client) {
     this.drive = google.drive({ version: "v3", auth });
-    this.oauth2 = google.oauth2({ version: "v2", auth });
   }
 
   async getOwner(): Promise<string> {
-    const res = await this.oauth2.userinfo.get();
-    return res.data.email ?? "";
+    const res = await this.drive.about.get({ fields: "user(emailAddress)" });
+    return res.data.user?.emailAddress ?? "";
   }
 
   // Alias for backwards compat

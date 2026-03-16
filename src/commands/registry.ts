@@ -155,6 +155,40 @@ export async function registryAddCollectionCommand(
   console.log(chalk.green(`Added "${collectionName}" to registry "${reg.name}".`));
 }
 
+export async function registryRemoveCollectionCommand(collectionName: string): Promise<void> {
+  let config: Config;
+  try { config = readConfig(); } catch {
+    console.log(chalk.red("No config found."));
+    return;
+  }
+
+  if (config.registries.length === 0) {
+    console.log(chalk.red("No registries configured."));
+    return;
+  }
+
+  const reg = config.registries[0];
+  const backend = reg.backend === "gdrive"
+    ? new GDriveBackend(await ensureAuth())
+    : new LocalBackend();
+
+  const data = await backend.readRegistry(reg);
+  const idx = data.collections.findIndex((c) => c.name === collectionName);
+  if (idx < 0) {
+    console.log(chalk.yellow(`Collection "${collectionName}" not found in registry.`));
+    return;
+  }
+
+  data.collections.splice(idx, 1);
+  await backend.writeRegistry(reg, data);
+
+  // Also remove from local config collections
+  config.collections = config.collections.filter((c) => c.name !== collectionName);
+  writeConfig(config);
+
+  console.log(chalk.green(`Removed "${collectionName}" from registry "${reg.name}".`));
+}
+
 export async function registryPushCommand(options: { backend?: string }): Promise<void> {
   const targetBackend = options.backend ?? "gdrive";
 

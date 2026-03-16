@@ -17,7 +17,7 @@ import { collectionCreateCommand } from "./commands/collection.js";
 import { installCommand, uninstallCommand } from "./commands/install.js";
 import {
   registryCreateCommand, registryListCommand, registryDiscoverCommand,
-  registryAddCollectionCommand, registryPushCommand,
+  registryAddCollectionCommand, registryRemoveCollectionCommand, registryPushCommand,
 } from "./commands/registry.js";
 
 const supportedAgents = Object.keys(AGENT_PATHS).join(", ");
@@ -137,6 +137,11 @@ registry
   .action((name: string, options: { backend?: string; ref?: string }) =>
     registryAddCollectionCommand(name, options)
   );
+
+registry
+  .command("remove-collection <name>")
+  .description("Remove a collection reference from the registry")
+  .action((name: string) => registryRemoveCollectionCommand(name));
 
 registry
   .command("push")
