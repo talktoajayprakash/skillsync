@@ -32,6 +32,11 @@ function workdirFor(repo: string): string {
   return path.join(GITHUB_WORKDIR, repo.replace("/", "_"));
 }
 
+/** Returns the repo where skill files live — defaults to the collection host repo. */
+function skillsRepo(col: import("../types.js").CollectionFile, hostRepo: string): string {
+  return (col.metadata?.repo as string | undefined) ?? hostRepo;
+}
+
 // ── CLI helpers ───────────────────────────────────────────────────────────────
 
 function ghExec(
@@ -241,18 +246,18 @@ export class GithubBackend implements StorageBackend {
   async downloadSkill(
     collection: CollectionInfo, skillName: string, destDir: string
   ): Promise<void> {
-    const { repo } = parseRef(collection.folderId);
-    const workdir = this.ensureWorkdir(repo);
-    // Refresh to get latest
-    gitExec(["pull", "--ff-only"], workdir);
+    const { repo: hostRepo } = parseRef(collection.folderId);
     const col = await this.readCollection(collection);
     const entry = col.skills.find((s) => s.name === skillName);
     if (!entry) {
       throw new Error(`Skill "${skillName}" not found in collection "${collection.name}"`);
     }
+    const srcRepo = skillsRepo(col, hostRepo);
+    const workdir = this.ensureWorkdir(srcRepo);
+    gitExec(["pull", "--ff-only"], workdir);
     const skillPath = path.join(workdir, entry.path);
     if (!fs.existsSync(skillPath)) {
-      throw new Error(`Skill directory not found at "${entry.path}" in repo "${repo}"`);
+      throw new Error(`Skill directory not found at "${entry.path}" in repo "${srcRepo}"`);
     }
     if (path.resolve(skillPath) !== path.resolve(destDir)) {
       copyDirSync(skillPath, destDir);
@@ -262,8 +267,19 @@ export class GithubBackend implements StorageBackend {
   async uploadSkill(
     collection: CollectionInfo, localPath: string, skillName: string
   ): Promise<void> {
-    const { repo } = parseRef(collection.folderId);
-    const workdir = this.ensureWorkdir(repo);
+    const { repo: hostRepo } = parseRef(collection.folderId);
+
+    // If collection points to a foreign skills repo, we can't upload there
+    const col = await this.readCollection(collection);
+    const foreign = col.metadata?.repo as string | undefined;
+    if (foreign && foreign !== hostRepo) {
+      throw new Error(
+        `Cannot upload skill to collection "${collection.name}": its skills source is "${foreign}" (a repo you may not own). ` +
+        `Use --remote-path to register a skill path from that repo instead.`
+      );
+    }
+
+    const workdir = this.ensureWorkdir(hostRepo);
     const resolvedLocal = path.resolve(localPath);
     const resolvedWorkdir = path.resolve(workdir);
 
@@ -293,11 +309,12 @@ export class GithubBackend implements StorageBackend {
   }
 
   async deleteSkill(collection: CollectionInfo, skillName: string): Promise<void> {
-    const { repo } = parseRef(collection.folderId);
-    const workdir = this.ensureWorkdir(repo);
+    const { repo: hostRepo } = parseRef(collection.folderId);
     const col = await this.readCollection(collection);
     const entry = col.skills.find((s) => s.name === skillName);
     if (!entry) return;
+    const srcRepo = skillsRepo(col, hostRepo);
+    const workdir = this.ensureWorkdir(srcRepo);
     const skillPath = path.join(workdir, entry.path);
     if (!fs.existsSync(skillPath)) return;
     fs.rmSync(skillPath, { recursive: true, force: true });
@@ -387,7 +404,9 @@ export class GithubBackend implements StorageBackend {
 
   // ── createCollection ─────────────────────────────────────────────────────────
 
-  async createCollection(collectionName: string, repoRef?: string): Promise<CollectionInfo> {
+  async createCollection(
+    collectionName: string, repoRef?: string, skillsRepoRef?: string
+  ): Promise<CollectionInfo> {
     if (!repoRef) throw new Error("GitHub backend requires --repo <owner/repo>");
     const repo = repoRef;
     await this.ensureRepo(repo);
@@ -398,6 +417,9 @@ export class GithubBackend implements StorageBackend {
 
     const owner = await this.getOwner();
     const colData: CollectionFile = { name: collectionName, owner, skills: [] };
+    if (skillsRepoRef && skillsRepoRef !== repo) {
+      colData.metadata = { repo: skillsRepoRef };
+    }
     fs.writeFileSync(filePath, serializeCollection(colData));
     gitExec(["add", path.join(metaDir, COLLECTION_FILENAME)], workdir);
     await this.commitAndPush(workdir, `chore: init collection ${collectionName}`);

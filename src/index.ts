@@ -106,11 +106,14 @@ program
   );
 
 program
-  .command("add <path>")
-  .description("Upload a local skill directory to a collection")
+  .command("add [path]")
+  .description("Upload a local skill directory to a collection, or register a remote path")
   .option("--collection <name>", "Target collection (default: first available)")
-  .action((skillPath: string, options: { collection?: string }) =>
-    addCommand(skillPath, options)
+  .option("--remote-path <rel/path>", "Register a skill path from the collection's skills-source repo (no local files needed)")
+  .option("--name <name>", "Skill name (required with --remote-path)")
+  .option("--description <desc>", "Skill description (used with --remote-path)")
+  .action((skillPath: string | undefined, options: { collection?: string; remotePath?: string; name?: string; description?: string }) =>
+    addCommand(skillPath ?? "", options)
   );
 
 program
@@ -149,7 +152,8 @@ collection
   .description("Create a new collection (defaults to SKILLS_MY_SKILLS)")
   .option("--backend <backend>", "gdrive (default) or github", "gdrive")
   .option("--repo <owner/repo>", "GitHub repo to use (required for --backend github)")
-  .action((name: string | undefined, options: { backend?: string; repo?: string }) =>
+  .option("--skills-repo <owner/repo>", "GitHub repo where skills live (github backend only; defaults to --repo)")
+  .action((name: string | undefined, options: { backend?: string; repo?: string; skillsRepo?: string }) =>
     collectionCreateCommand(name, options)
   );
 

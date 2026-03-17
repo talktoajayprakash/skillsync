@@ -11,18 +11,18 @@ import { resolveBackend } from "../backends/resolve.js";
 
 export async function collectionCreateCommand(
   name?: string,
-  options: { backend?: string; repo?: string } = {}
+  options: { backend?: string; repo?: string; skillsRepo?: string } = {}
 ): Promise<void> {
   const backendName = options.backend ?? "gdrive";
 
   if (backendName === "github") {
-    await createGithubCollection(name, options.repo);
+    await createGithubCollection(name, options.repo, options.skillsRepo);
   } else {
     await createGdriveCollection(name);
   }
 }
 
-async function createGithubCollection(name?: string, repo?: string): Promise<void> {
+async function createGithubCollection(name?: string, repo?: string, skillsRepo?: string): Promise<void> {
   if (!repo) {
     console.log(chalk.red("GitHub backend requires --repo <owner/repo>"));
     console.log(chalk.dim("  Example: skillsmanager collection create my-skills --backend github --repo owner/my-repo"));
@@ -32,10 +32,14 @@ async function createGithubCollection(name?: string, repo?: string): Promise<voi
   const collectionName = name ?? "default";
   const backend = new GithubBackend();
 
-  console.log(chalk.bold(`\nCreating GitHub collection "${collectionName}" in ${repo}...\n`));
+  if (skillsRepo && skillsRepo !== repo) {
+    console.log(chalk.bold(`\nCreating GitHub collection "${collectionName}" in ${repo} (skills source: ${skillsRepo})...\n`));
+  } else {
+    console.log(chalk.bold(`\nCreating GitHub collection "${collectionName}" in ${repo}...\n`));
+  }
 
   try {
-    const collection = await backend.createCollection(collectionName, repo);
+    const collection = await backend.createCollection(collectionName, repo, skillsRepo);
     console.log(chalk.green(`\n  ✓ Collection "${collectionName}" created in github:${collection.folderId}`));
 
     const config = loadOrDefaultConfig();

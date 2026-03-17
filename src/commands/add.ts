@@ -11,8 +11,14 @@ import type { StorageBackend } from "../backends/interface.js";
 
 export async function addCommand(
   skillPath: string,
-  options: { collection?: string }
+  options: { collection?: string; remotePath?: string; name?: string; description?: string }
 ): Promise<void> {
+  // ── Remote-path mode: register a skill from a foreign repo without local files ─
+  if (options.remotePath) {
+    await addRemotePath(options);
+    return;
+  }
+
   const absPath = path.resolve(skillPath);
 
   if (!fs.existsSync(absPath) || !fs.statSync(absPath).isDirectory()) {
@@ -85,8 +91,101 @@ export async function addCommand(
     return;
   }
 
+  // If the collection has metadata.repo (foreign skills repo), handle specially
+  if (collection.backend === "github") {
+    const github = new GithubBackend();
+    const col = await github.readCollection(collection);
+    const foreignRepo = col.metadata?.repo as string | undefined;
+    if (foreignRepo) {
+      const ctx = GithubBackend.detectRepoContext(absPath);
+      if (!ctx || ctx.repo !== foreignRepo) {
+        console.log(chalk.red(
+          `This collection's skills source is "${foreignRepo}". ` +
+          `The provided path does not belong to that repo.\n` +
+          chalk.dim(`  To register a skill by path without a local clone, use:\n`) +
+          chalk.dim(`  skillsmanager add --collection ${collection.name} --remote-path <rel/path> --name <name> --description <desc>`)
+        ));
+        return;
+      }
+      // Path is from the foreign repo (cloned locally) — register relative path only, no upload
+      const spinner = ora(`Adding ${chalk.bold(skillName)} to ${collection.name}...`).start();
+      try {
+        const existing = col.skills.findIndex((s) => s.name === skillName);
+        const entry = { name: skillName, path: ctx.relPath, description };
+        if (existing >= 0) { col.skills[existing] = entry; } else { col.skills.push(entry); }
+        await github.writeCollection(collection, col);
+        trackSkill(skillName, collection.id, absPath);
+        spinner.succeed(`${chalk.bold(skillName)} registered in ${collection.name} at ${chalk.dim(ctx.relPath)}`);
+      } catch (err) {
+        spinner.fail(`Failed: ${(err as Error).message}`);
+      }
+      return;
+    }
+  }
+
   const backend = await resolveBackend(collection.backend);
   await uploadToCollection(backend, collection, absPath, skillName, description);
+}
+
+// ── Remote-path mode: register a skill entry without local files ─────────────
+
+async function addRemotePath(
+  options: { collection?: string; remotePath?: string; name?: string; description?: string }
+): Promise<void> {
+  const { remotePath, name: skillName, description = "", collection: collectionName } = options;
+  if (!remotePath) {
+    console.log(chalk.red("--remote-path requires a relative path (e.g. tools/my-skill/)"));
+    return;
+  }
+  if (!skillName) {
+    console.log(chalk.red("--remote-path requires --name <skill-name>"));
+    return;
+  }
+
+  let config;
+  try { config = readConfig(); } catch {
+    console.log(chalk.red("No config found. Run: skillsmanager collection create"));
+    return;
+  }
+
+  let collection: CollectionInfo | undefined = config.collections[0];
+  if (collectionName) {
+    const found = config.collections.find((c) => c.name === collectionName);
+    if (!found) {
+      console.log(chalk.red(`Collection "${collectionName}" not found.`));
+      console.log(chalk.dim(`  Available: ${config.collections.map((c) => c.name).join(", ")}`));
+      return;
+    }
+    collection = found;
+  }
+
+  if (!collection) {
+    console.log(chalk.red("No collections configured. Run: skillsmanager collection create"));
+    return;
+  }
+
+  if (collection.backend !== "github") {
+    console.log(chalk.red("--remote-path is only supported for GitHub collections."));
+    return;
+  }
+
+  const github = new GithubBackend();
+  const spinner = ora(`Registering ${chalk.bold(skillName)} in ${collection.name} at ${chalk.dim(remotePath)}...`).start();
+
+  try {
+    const col = await github.readCollection(collection);
+    const existing = col.skills.findIndex((s) => s.name === skillName);
+    const entry = { name: skillName, path: remotePath, description };
+    if (existing >= 0) {
+      col.skills[existing] = entry;
+    } else {
+      col.skills.push(entry);
+    }
+    await github.writeCollection(collection, col);
+    spinner.succeed(`${chalk.bold(skillName)} registered in ${collection.name} at ${chalk.dim(remotePath)}`);
+  } catch (err) {
+    spinner.fail(`Failed: ${(err as Error).message}`);
+  }
 }
 
 // ── GitHub path: register in-repo skill or copy external skill ────────────────
@@ -102,6 +201,30 @@ async function addToGithub(
   const spinner = ora(`Adding ${chalk.bold(skillName)} to github:${collection.folderId}...`).start();
 
   try {
+    const col = await github.readCollection(collection);
+    const foreignRepo = col.metadata?.repo as string | undefined;
+    const hostRepo = collection.folderId.split(":")[0];
+
+    // If collection has metadata.repo pointing to a foreign repo, validate that
+    // the local skill belongs to that foreign repo (not the collection host repo).
+    if (foreignRepo && foreignRepo !== hostRepo) {
+      if (ctx.repo !== foreignRepo) {
+        spinner.fail(
+          `This collection's skills source is "${foreignRepo}" but the provided path belongs to "${ctx.repo}".`
+        );
+        return;
+      }
+      // Skill is in the foreign repo (cloned locally) — register path only, no upload
+      const entry = { name: skillName, path: ctx.relPath, description };
+      const existing = col.skills.findIndex((s) => s.name === skillName);
+      if (existing >= 0) { col.skills[existing] = entry; } else { col.skills.push(entry); }
+      await github.writeCollection(collection, col);
+      trackSkill(skillName, collection.id, absPath);
+      spinner.succeed(`${chalk.bold(skillName)} registered in github:${collection.folderId} at ${chalk.dim(ctx.relPath)}`);
+      return;
+    }
+
+    // Standard case: skill is in (or being added to) the collection's host repo
     // uploadSkill is a no-op for in-repo skills; copies if external
     await github.uploadSkill(collection, absPath, skillName);
 
@@ -110,7 +233,6 @@ async function addToGithub(
       ? ctx.relPath                          // in-repo: use relative path
       : `.agentskills/${skillName}`;           // external: was copied here by uploadSkill
 
-    const col = await github.readCollection(collection);
     const existing = col.skills.findIndex((s) => s.name === skillName);
     if (existing >= 0) {
       col.skills[existing] = { name: skillName, path: skillEntry, description };

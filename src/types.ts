@@ -11,6 +11,7 @@ export interface CollectionFile {
   name: string;
   owner: string;
   skills: SkillEntry[];
+  metadata?: Record<string, unknown>; // backend-specific extras (e.g. github: { repo: "owner/repo" })
 }
 
 export interface CollectionInfo {

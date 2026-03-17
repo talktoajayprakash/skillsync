@@ -11,7 +11,7 @@ export const LEGACY_COLLECTION_FILENAME = "SKILLS_SYNC.yaml";
 
 export function parseCollection(content: string): CollectionFile {
   const data = YAML.parse(content);
-  return {
+  const col: CollectionFile = {
     name: data.name ?? "",
     owner: data.owner ?? "",
     skills: (data.skills ?? []).map((s: Record<string, string>) => ({
@@ -20,10 +20,14 @@ export function parseCollection(content: string): CollectionFile {
       description: s.description ?? "",
     })),
   };
+  if (data.metadata && typeof data.metadata === "object") {
+    col.metadata = data.metadata as Record<string, unknown>;
+  }
+  return col;
 }
 
 export function serializeCollection(collection: CollectionFile): string {
-  return YAML.stringify({
+  const obj: Record<string, unknown> = {
     name: collection.name,
     owner: collection.owner,
     skills: collection.skills.map((s) => ({
@@ -31,7 +35,11 @@ export function serializeCollection(collection: CollectionFile): string {
       path: s.path,
       description: s.description,
     })),
-  });
+  };
+  if (collection.metadata && Object.keys(collection.metadata).length > 0) {
+    obj.metadata = collection.metadata;
+  }
+  return YAML.stringify(obj);
 }
 
 // Backwards-compat aliases
