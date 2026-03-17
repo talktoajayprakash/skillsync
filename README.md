@@ -4,7 +4,7 @@
 [![CI](https://github.com/talktoajayprakash/skillsmanager/actions/workflows/release.yml/badge.svg)](https://github.com/talktoajayprakash/skillsmanager/actions)
 [![Docs](https://img.shields.io/badge/docs-skillsmanager-blue)](https://talktoajayprakash.github.io/skillsmanager)
 
-# Skills Manager
+# Skills Manager CLI
 
 **One place to manage, sync, and share all your AI agent skills — across every agent you use.**
 
