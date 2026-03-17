@@ -1,0 +1,21 @@
+title: Skills Manager
+description: Manage, sync, and share AI agent skills across every agent you use.
+remote_theme: just-the-docs/just-the-docs
+url: https://talktoajayprakash.github.io/skillsmanager
+
+color_scheme: dark
+
+aux_links:
+  "GitHub":
+    - "https://github.com/talktoajayprakash/skillsmanager"
+  "npm":
+    - "https://www.npmjs.com/package/@skillsmanager/cli"
+
+aux_links_new_tab: true
+
+nav_sort: order
+
+footer_content: "Skills Manager is open source under the <a href=\"https://github.com/talktoajayprakash/skillsmanager/blob/main/LICENSE\">Apache 2.0 License</a>."
+
+plugins:
+  - jekyll-seo-tag

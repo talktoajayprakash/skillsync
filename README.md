@@ -2,6 +2,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Node >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![CI](https://github.com/talktoajayprakash/skillsmanager/actions/workflows/release.yml/badge.svg)](https://github.com/talktoajayprakash/skillsmanager/actions)
+[![Docs](https://img.shields.io/badge/docs-skillsmanager-blue)](https://talktoajayprakash.github.io/skillsmanager)
 
 # Skills Manager
 

@@ -1,0 +1,256 @@
+---
+title: Protocol Spec
+nav_order: 5
+---
+
+# Protocol Specification
+
+This page covers the full registry and collection architecture — the protocol that Skills Manager uses to store, discover, and resolve skills across backends.
+
+---
+
+## Architecture overview
+
+Skills Manager uses a two-tier structure:
+
+```
+SKILLS_REGISTRY.yaml              ← root index (points to all collections)
+├── Collection A/
+│   ├── SKILLS_COLLECTION.yaml    ← collection index
+│   ├── skill-1/
+│   │   └── SKILL.md
+│   └── skill-2/
+│       └── SKILL.md
+└── Collection B/
+    ├── SKILLS_COLLECTION.yaml
+    └── skill-3/
+        └── SKILL.md
+```
+
+**Registry** — the root node. Lists all collections the user has access to.
+
+**Collection** — a folder containing skills, indexed by `SKILLS_COLLECTION.yaml`.
+
+**Skill** — a directory with a `SKILL.md` file. See [Skill Format](./skill-format) for structure.
+
+---
+
+## File formats
+
+### SKILLS_REGISTRY.yaml
+
+The root registry file. Lives at the top of a backend (Drive root, repo root, `~/.skillsmanager/registry.yaml` for local).
+
+```yaml
+name: my-registry
+owner: you@example.com
+source: local                    # where this registry lives: local | gdrive | github
+collections:
+  - name: my-skills
+    backend: local               # local | gdrive | github
+    ref: my-skills               # backend-specific pointer (folder name, repo path, etc.)
+  - name: team-prompts
+    backend: gdrive
+    ref: SKILLS_TEAM_PROMPTS     # Drive folder name
+```
+
+**Rules:**
+- A remote registry (e.g. `source: gdrive`) cannot contain `backend: local` collection refs. Local paths don't resolve on other machines.
+- `skillsmanager registry push` enforces this — it uploads all local collections to the target backend and rewrites refs before pushing.
+
+### SKILLS_COLLECTION.yaml
+
+The collection index file. Lives inside each collection folder.
+
+```yaml
+name: my-skills
+owner: you@example.com
+skills:
+  - name: code-review
+    path: code-review/
+    description: Opinionated code review workflow
+  - name: write-tests
+    path: write-tests/
+    description: Generates unit tests for a given function or module
+```
+
+{: .note }
+The legacy filename `SKILLS_SYNC.yaml` is still recognized for backwards compatibility.
+
+---
+
+## Discovery flow
+
+When Skills Manager needs to find skills, it runs two phases:
+
+### Phase 1 — Registry path
+
+1. Search the backend for `SKILLS_REGISTRY.yaml` files owned by the current user
+2. Read each registry → get collection references
+3. Resolve each ref to a concrete collection via `resolveCollectionRef()`
+4. No scanning needed — the registry is the source of truth
+
+### Phase 2 — Orphan fallback
+
+1. Scan the backend for `SKILLS_COLLECTION.yaml` (or legacy `SKILLS_SYNC.yaml`) directly
+2. Collections found here that aren't already known from Phase 1 are added
+3. Ensures backwards compatibility with collections created before the registry existed
+
+---
+
+## UUID strategy
+
+Every registry and collection gets a **stable UUID** assigned by the config layer (not the backend).
+
+- Stored in `~/.skillsmanager/config.json`
+- Used for cache paths: `~/.skillsmanager/cache/<uuid>/<skill-name>/`
+- Matched across refreshes by `folderId` (backend-specific location identifier) via `mergeCollections()` and `mergeRegistries()`
+- Stable even if a collection is renamed or migrated to a different backend
+- Never shared across machines — each machine assigns its own UUIDs
+
+This means cache paths don't break when you rename a collection or move it between backends.
+
+---
+
+## Registry scoping rules
+
+| Registry location | Can reference | Cannot reference |
+|---|---|---|
+| Local (`~/.skillsmanager/`) | Local collections, remote collections | — |
+| Remote (Google Drive, GitHub, etc.) | Remote collections only | Local collections |
+
+**Why:** A remote registry pointing to `backend: local` is broken by design — another machine or agent reading it has no way to resolve a local path.
+
+---
+
+## Transactional push
+
+`skillsmanager registry push --backend gdrive` is **all-or-nothing**.
+
+**Phase 1 — Upload (no state changes yet):**
+1. Authenticate with the target backend
+2. Create or locate the remote registry
+3. For each `backend: local` collection:
+   - Create the remote folder
+   - Upload all skill files
+   - Write `SKILLS_COLLECTION.yaml`
+4. Accumulate results in memory only
+5. If any upload fails → abort. Local state is completely untouched.
+
+**Phase 2 — Commit (only after all uploads succeed):**
+1. Write all new collection refs to the remote registry in a single `writeRegistry()` call
+2. Update local `config.json` with the new remote collections and registry
+3. Print success summary
+
+---
+
+## Storage backend interface
+
+Every backend implements this interface. Skills Manager is backend-agnostic — the protocol layer never calls backend-specific code directly.
+
+```typescript
+interface StorageBackend {
+  // Identity
+  getOwner(): Promise<string>;
+
+  // Collections
+  discoverCollections(): Promise<Omit<CollectionInfo, "id">[]>;
+  readCollection(collection: CollectionInfo): Promise<CollectionFile>;
+  writeCollection(collection: CollectionInfo, data: CollectionFile): Promise<void>;
+  downloadSkill(collection: CollectionInfo, skillName: string, destDir: string): Promise<void>;
+  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void>;
+
+  // Registries
+  discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]>;
+  readRegistry(registry: RegistryInfo): Promise<RegistryFile>;
+  writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void>;
+  resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id">>;
+  createRegistry(name: string): Promise<Omit<RegistryInfo, "id">>;
+}
+```
+
+Note: `discoverCollections` and `discoverRegistries` return without `id` — UUID assignment is handled by the config layer (`mergeCollections()`, `mergeRegistries()`), not the backend. This keeps backends storage-agnostic.
+
+---
+
+## Local cache and symlinks
+
+When a skill is fetched:
+
+1. The skill files are downloaded to `~/.skillsmanager/cache/<collection-uuid>/<skill-name>/`
+2. A symlink is created in the agent's skills directory pointing to the cache:
+
+```
+~/.claude/skills/code-review  →  ~/.skillsmanager/cache/<uuid>/code-review/
+~/.cursor/skills/code-review  →  ~/.skillsmanager/cache/<uuid>/code-review/
+```
+
+One copy on disk. Many agents. Update the cache once — all agents pick up the change immediately.
+
+---
+
+## Config file schema
+
+`~/.skillsmanager/config.json`:
+
+```json
+{
+  "registries": [
+    {
+      "id": "a1b2c3d4-...",
+      "name": "my-registry",
+      "backend": "gdrive",
+      "folderId": "1bZW0-Nic5D53dBwMH_h7JN_aB0W-Rqyq",
+      "fileId": "1yMuqe7JmelSYqm9TptKBWPk5ThTV5OJo"
+    }
+  ],
+  "collections": [
+    {
+      "id": "f47ac10b-...",
+      "name": "my-skills",
+      "backend": "gdrive",
+      "folderId": "1bZW0-Nic5D53dBwMH_h7JN_aB0W-Rqyq",
+      "registryFileId": "1yMuqe7JmelSYqm9TptKBWPk5ThTV5OJo",
+      "sourceRegistryId": "a1b2c3d4-..."
+    }
+  ],
+  "skills": {
+    "code-review": [
+      {
+        "collectionId": "f47ac10b-...",
+        "installedAt": ["/Users/you/.claude/skills/code-review"]
+      }
+    ]
+  },
+  "discoveredAt": "2026-03-16T00:06:33.570Z"
+}
+```
+
+---
+
+## Backwards compatibility
+
+| Scenario | Behavior |
+|---|---|
+| Old `SKILLS_SYNC.yaml` | Read and recognized normally |
+| No registry exists | Falls back to direct collection scan (Phase 2 only) |
+| Config missing `registries` field | Backfilled to `[]` |
+| Mix of local + remote collections | Both appear in unified skill list |
+| Remote registry with `backend: local` refs | Prevented by `registry push` |
+
+---
+
+## Agent Skills open standard
+
+Skills Manager is built on top of the [Agent Skills open standard](https://agentskills.io). The `SKILL.md` format, directory structure, and loading conventions are defined by that spec. Any agent that implements the standard can consume skills managed by Skills Manager.
+
+| Agent | Skills directory | Docs |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | [docs](https://code.claude.com/docs/en/skills) |
+| OpenAI Codex | `~/.codex/skills/` | [docs](https://developers.openai.com/codex/skills/) |
+| Cursor | `~/.cursor/skills/` | [docs](https://cursor.com/docs/context/skills) |
+| Windsurf | `~/.codeium/windsurf/skills/` | [docs](https://codeium.com) |
+| GitHub Copilot | `~/.copilot/skills/` | [docs](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) |
+| Gemini CLI | `~/.gemini/skills/` | [docs](https://geminicli.com/docs/cli/skills/) |
+| OpenClaw | `~/.openclaw/skills/` | [docs](https://docs.openclaw.ai/tools/skills) |
+| Roo Code | `~/.roo/skills/` | [docs](https://docs.roocode.com/features/skills) |
