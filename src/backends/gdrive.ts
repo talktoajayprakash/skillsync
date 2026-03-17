@@ -198,7 +198,7 @@ export class GDriveBackend implements StorageBackend {
     } while (pageToken);
   }
 
-  async createCollection(folderName: string): Promise<CollectionInfo> {
+  async createCollection(folderName: string, skillType?: string, skillsRepo?: string): Promise<CollectionInfo> {
     const folderRes = await this.drive.files.create({
       requestBody: {
         name: folderName,
@@ -211,6 +211,8 @@ export class GDriveBackend implements StorageBackend {
     const owner = await this.getOwnerEmail();
     const logicalName = folderName.replace(/^SKILLS_/i, "");
     const emptyCollection: CollectionFile = { name: logicalName, owner, skills: [] };
+    if (skillType) emptyCollection.type = skillType;
+    if (skillsRepo) emptyCollection.metadata = { repo: skillsRepo };
     const content = serializeCollection(emptyCollection);
     const fileRes = await this.drive.files.create({
       requestBody: {

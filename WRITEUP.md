@@ -246,6 +246,69 @@ One copy, many agents. Update once, all agents get the change.
 
 ---
 
+## Cross-Backend Skill Routing
+
+### The problem
+
+A collection YAML can live anywhere (Google Drive, GitHub, local), but skill files may need to live in a different location — for example, a curated collection hosted in Drive that points to a public GitHub skills library. Initially this routing logic was duplicated inside `GDriveBackend`, which would have required repeating it in every future backend.
+
+### The `type` field
+
+`SKILLS_COLLECTION.yaml` gains two optional fields:
+
+```yaml
+type: github          # declares who handles skill-file operations
+metadata:
+  repo: owner/skills-repo   # type-specific config
+```
+
+When `type` is absent, skill files come from the same backend as the collection YAML. When `type: github` is set, `skillsmanager fetch` clones skill files from `metadata.repo` regardless of where the collection YAML is stored.
+
+### RoutingBackend — the decorator pattern
+
+All backends are wrapped with a `RoutingBackend` decorator inside `resolveBackend()`:
+
+```
+resolveBackend("gdrive") → new RoutingBackend(new GDriveBackend(auth))
+resolveBackend("github") → new RoutingBackend(new GithubBackend())
+resolveBackend("local")  → new RoutingBackend(new LocalBackend())
+```
+
+`RoutingBackend` intercepts the three skill-file operations and dispatches based on `col.type`:
+
+```
+downloadSkill  → col.type == "github" && backend != "github" → GithubBackend.downloadSkillFromRepo()
+               → otherwise                                    → inner.downloadSkill()
+
+uploadSkill    → col.type != collection.backend               → throw (--remote-path hint)
+               → github collection + metadata.repo != hostRepo → throw (foreign repo guard)
+               → otherwise                                    → inner.uploadSkill()
+
+deleteSkill    → col.type == "github" && backend != "github"  → GithubBackend.deleteSkillFromRepo()
+               → otherwise                                    → inner.deleteSkill()
+```
+
+All other methods (registry ops, `readCollection`, `writeCollection`) pass straight through to the inner backend — the YAML always lives where the collection was declared.
+
+**Key invariant:** cross-dispatch only happens when `skillType !== collection.backend`. Same-backend collections always fall through to the inner backend, which handles any internal routing (e.g. `GithubBackend.downloadSkill` uses `skillsRepo()` internally for `metadata.repo` GitHub collections).
+
+### Individual backends stay pure
+
+- `GDriveBackend` never imports `GithubBackend` — it only knows about Google Drive
+- `GithubBackend` never needs to check `col.type` for foreign collections
+- Adding a new skill source type (e.g. `type: s3`) only requires updating `RoutingBackend`, not each backend
+
+### `--remote-path` for cross-backend `add`
+
+When a collection has `type: github`, uploading local skill files makes no sense — the canonical files live in the GitHub repo. `skillsmanager add --remote-path` registers a skill entry (path + name + description) into the collection YAML without touching any skill files:
+
+```bash
+skillsmanager add --remote-path skills/write-tests/ --name write-tests \
+  --description "Generate unit tests" --collection curated-col
+```
+
+---
+
 ## Storage Backend Architecture
 
 The `StorageBackend` interface is the only contract backends must implement:
@@ -328,3 +391,6 @@ Note: `discoverRegistries` returns without `id` — UUID assignment is handled b
 | Collection create → auto-register | Always registers immediately in existing registry | Prevents orphaned collections; registry is auto-created if none exists |
 | `registry push` idempotency | Skip collections already in remote registry | Safe to re-run for incremental updates; no duplicate refs |
 | Direct registry writes | All mutation commands write to registry's own backend immediately | No explicit sync step needed after add/remove operations |
+| Cross-backend routing | `RoutingBackend` decorator wraps all backends | Centralizes `col.type` dispatch; individual backends stay pure and don't need to know about other backends |
+| `type` field in SKILLS_COLLECTION.yaml | Declares skill-file handler; absent = same as collection backend | Portable — survives moving collection between backends; self-contained in the YAML |
+| `--remote-path` for cross-backend `add` | Registers path pointer without uploading files | You can't upload to a foreign repo; pointer registration is the correct operation |

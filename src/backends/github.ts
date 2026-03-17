@@ -32,9 +32,12 @@ function workdirFor(repo: string): string {
   return path.join(GITHUB_WORKDIR, repo.replace("/", "_"));
 }
 
-/** Returns the repo where skill files live — defaults to the collection host repo. */
+/** Returns the repo where skill files live — respects col.type + metadata.repo; defaults to host repo. */
 function skillsRepo(col: import("../types.js").CollectionFile, hostRepo: string): string {
-  return (col.metadata?.repo as string | undefined) ?? hostRepo;
+  if (col.type === "github" || col.type === undefined) {
+    return (col.metadata?.repo as string | undefined) ?? hostRepo;
+  }
+  return hostRepo;
 }
 
 // ── CLI helpers ───────────────────────────────────────────────────────────────
@@ -243,6 +246,30 @@ export class GithubBackend implements StorageBackend {
     await this.commitAndPush(workdir, `chore: update ${COLLECTION_FILENAME} for ${collection.name}`);
   }
 
+  /** Clone/pull repo and copy relPath to destDir. Usable by other backends for cross-backend routing. */
+  async downloadSkillFromRepo(repo: string, relPath: string, destDir: string): Promise<void> {
+    const workdir = this.ensureWorkdir(repo);
+    gitExec(["pull", "--ff-only"], workdir);
+    const skillPath = path.join(workdir, relPath);
+    if (!fs.existsSync(skillPath)) {
+      throw new Error(`Skill directory not found at "${relPath}" in repo "${repo}"`);
+    }
+    if (path.resolve(skillPath) !== path.resolve(destDir)) {
+      copyDirSync(skillPath, destDir);
+    }
+  }
+
+  /** Clone/pull repo and delete relPath. Usable by other backends for cross-backend routing. */
+  async deleteSkillFromRepo(repo: string, relPath: string): Promise<void> {
+    const workdir = this.ensureWorkdir(repo);
+    gitExec(["pull", "--ff-only"], workdir);
+    const skillPath = path.join(workdir, relPath);
+    if (!fs.existsSync(skillPath)) return;
+    fs.rmSync(skillPath, { recursive: true, force: true });
+    gitExec(["add", "-A"], workdir);
+    await this.commitAndPush(workdir, `chore: remove skill at ${relPath}`);
+  }
+
   async downloadSkill(
     collection: CollectionInfo, skillName: string, destDir: string
   ): Promise<void> {
@@ -253,32 +280,13 @@ export class GithubBackend implements StorageBackend {
       throw new Error(`Skill "${skillName}" not found in collection "${collection.name}"`);
     }
     const srcRepo = skillsRepo(col, hostRepo);
-    const workdir = this.ensureWorkdir(srcRepo);
-    gitExec(["pull", "--ff-only"], workdir);
-    const skillPath = path.join(workdir, entry.path);
-    if (!fs.existsSync(skillPath)) {
-      throw new Error(`Skill directory not found at "${entry.path}" in repo "${srcRepo}"`);
-    }
-    if (path.resolve(skillPath) !== path.resolve(destDir)) {
-      copyDirSync(skillPath, destDir);
-    }
+    await this.downloadSkillFromRepo(srcRepo, entry.path, destDir);
   }
 
   async uploadSkill(
     collection: CollectionInfo, localPath: string, skillName: string
   ): Promise<void> {
     const { repo: hostRepo } = parseRef(collection.folderId);
-
-    // If collection points to a foreign skills repo, we can't upload there
-    const col = await this.readCollection(collection);
-    const foreign = col.metadata?.repo as string | undefined;
-    if (foreign && foreign !== hostRepo) {
-      throw new Error(
-        `Cannot upload skill to collection "${collection.name}": its skills source is "${foreign}" (a repo you may not own). ` +
-        `Use --remote-path to register a skill path from that repo instead.`
-      );
-    }
-
     const workdir = this.ensureWorkdir(hostRepo);
     const resolvedLocal = path.resolve(localPath);
     const resolvedWorkdir = path.resolve(workdir);
@@ -314,12 +322,7 @@ export class GithubBackend implements StorageBackend {
     const entry = col.skills.find((s) => s.name === skillName);
     if (!entry) return;
     const srcRepo = skillsRepo(col, hostRepo);
-    const workdir = this.ensureWorkdir(srcRepo);
-    const skillPath = path.join(workdir, entry.path);
-    if (!fs.existsSync(skillPath)) return;
-    fs.rmSync(skillPath, { recursive: true, force: true });
-    gitExec(["add", "-A"], workdir);
-    await this.commitAndPush(workdir, `chore: remove skill ${skillName}`);
+    await this.deleteSkillFromRepo(srcRepo, entry.path);
   }
 
   // ── Registry operations ───────────────────────────────────────────────────────

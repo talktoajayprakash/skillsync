@@ -72,10 +72,13 @@ skillsmanager refresh        # discovers collections in your Drive
 | `skillsmanager search <query>` | Search skills by name or description |
 | `skillsmanager fetch <name> --agent <agent>` | Download and install a skill for an agent |
 | `skillsmanager add <path>` | Upload a local skill to a collection |
+| `skillsmanager add --remote-path <path> --name <n> --description <d>` | Register a remote skill path (no upload) |
 | `skillsmanager update <path>` | Push local changes back to remote storage |
 | `skillsmanager refresh` | Re-discover collections from remote |
-| `skillsmanager collection create` | Create a new skill collection |
+| `skillsmanager collection create [name] --backend github --repo <owner/repo>` | Create a collection in a GitHub repo |
+| `skillsmanager collection create [name] --skills-repo <owner/repo>` | Create a collection with skills in a separate GitHub repo |
 | `skillsmanager registry push --backend gdrive` | Push local registry to Google Drive |
+| `skillsmanager registry push --backend github --repo <owner/repo>` | Push local registry to GitHub |
 
 ## Local Development
 

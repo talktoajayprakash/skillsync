@@ -74,6 +74,23 @@ skillsmanager add ./my-skill --collection work
 
 If `--collection` is omitted, the skill is added to the default collection.
 
+**Registering a remote skill path (cross-backend collections)**
+
+When a collection has a cross-backend skills source (e.g. `type: github` pointing to a GitHub repo), you cannot upload local files — the files already live in the remote repo. Instead, register a path pointer with `--remote-path`:
+
+```bash
+skillsmanager add --remote-path <path-in-repo> --name <skill-name> --description "<desc>" --collection <name>
+```
+
+Example:
+```bash
+skillsmanager add --remote-path skills/write-tests/ --name write-tests \
+  --description "Generate unit tests for a function or module" \
+  --collection my-curated-col
+```
+
+This writes an entry into `SKILLS_COLLECTION.yaml` without touching any skill files. When a user fetches the skill, the files are pulled from the declared `metadata.repo`.
+
 ### `skillsmanager update`
 
 Pushes local changes to an existing skill back to remote storage.
@@ -96,7 +113,23 @@ Creates a new skill collection.
 ```bash
 skillsmanager collection create
 skillsmanager collection create my-collection
+skillsmanager collection create my-collection --backend github --repo owner/repo
+skillsmanager collection create my-collection --backend gdrive
 ```
+
+**Cross-backend collections: `--skills-repo`**
+
+Use `--skills-repo` to create a collection whose skill files live in a specific GitHub repo, regardless of where the collection YAML is stored:
+
+```bash
+# Collection YAML in Google Drive, skill files in a GitHub repo
+skillsmanager collection create curated --backend gdrive --skills-repo owner/skills-repo
+
+# Collection YAML in one GitHub repo, skill files in another
+skillsmanager collection create curated --backend github --repo owner/registry-repo --skills-repo owner/skills-repo
+```
+
+This sets `type: github` and `metadata.repo` in the generated `SKILLS_COLLECTION.yaml`. After creating such a collection, register skill entries with `skillsmanager add --remote-path ...` rather than uploading files.
 
 ---
 

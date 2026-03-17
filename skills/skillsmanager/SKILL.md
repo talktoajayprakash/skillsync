@@ -5,7 +5,7 @@ description: Discover, fetch, add, and update agent skills from local or remote 
 
 # Skills Manager
 
-Skills Manager is a CLI tool for managing agent skills stored locally or in remote storage (Google Drive). Use it to find, install, share, and update skills. Works offline by default — no setup needed for local use.
+Skills Manager is a CLI tool for managing agent skills stored locally or in remote storage (Google Drive, GitHub). Use it to find, install, share, and update skills. Works offline by default — no setup needed for local use.
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ skillsmanager list
 
 Supported agents: `claude`, `codex`, `agents`, `cursor`, `windsurf`, `copilot`, `gemini`, `roo`, `openclaw`, `antigravity`
 
-### Share a skill
+### Share a skill you own
 
 ```bash
 # Upload a local skill directory to a collection
@@ -43,6 +43,18 @@ skillsmanager add <path>
 
 # Upload to a specific collection
 skillsmanager add <path> --collection <name>
+```
+
+### Register a skill path without uploading files (cross-repo / curated collections)
+
+Use `--remote-path` when the skill files already exist in a remote backend and you just want to register a pointer to them. You cannot `add` local files to a cross-backend collection — you must use this flag instead.
+
+```bash
+# Register a skill entry by path — no file upload
+skillsmanager add --remote-path <backend-path> --name <skill-name> --description "<description>" --collection <name>
+
+# Example: register a skill that lives in a GitHub repo
+skillsmanager add --remote-path skills/write-tests/ --name write-tests --description "Generate unit tests" --collection my-col
 ```
 
 ### Update a skill
@@ -105,8 +117,15 @@ skillsmanager registry remove-collection <name> --delete
 # Create a new collection (local by default)
 skillsmanager collection create [name]
 
-# Create a collection in a GitHub repo
+# Create a collection in a GitHub repo (skills stored in that repo)
 skillsmanager collection create [name] --backend github --repo <owner/repo>
+
+# Create a collection in Google Drive
+skillsmanager collection create [name] --backend gdrive
+
+# Create a collection whose skills live in a specific GitHub repo (cross-backend)
+skillsmanager collection create [name] --backend gdrive --skills-repo <owner/repo>
+skillsmanager collection create [name] --backend github --repo <owner/registry-repo> --skills-repo <owner/skills-repo>
 
 # Re-discover collections from storage
 skillsmanager refresh
@@ -128,13 +147,32 @@ skillsmanager install --path <dir>
 skillsmanager uninstall
 ```
 
+## Cross-backend collections (curated skill libraries)
+
+A collection can declare that its skill files live in a different GitHub repo than the collection YAML. This is indicated by `type: github` in `SKILLS_COLLECTION.yaml`.
+
+**When you encounter a cross-backend collection:**
+- `skillsmanager add <local-path> --collection <name>` → **will fail** with an error like `skills source type is "github"`. This is expected — you cannot upload local files to a foreign repo.
+- **Do this instead:** `skillsmanager add --remote-path <path-in-repo> --name <n> --description "<d>" --collection <name>`
+- `skillsmanager fetch <skill> --agent claude` → **works normally** — files are automatically pulled from the declared GitHub repo
+
+**How to identify a cross-backend collection:**
+- `skillsmanager registry list` — collections with a `--skills-repo` are shown with their skills repo
+- Reading the `SKILLS_COLLECTION.yaml` directly — look for `type: github` + `metadata.repo`
+
+**Quick rule:**
+- Own the skill files? → `skillsmanager add <path>`
+- Files already in a GitHub repo? → `skillsmanager add --remote-path <path> --name <n> --description "<d>"`
+
+---
+
 ## Common Workflows
 
 **User asks to find a skill:**
 1. `skillsmanager search <relevant terms>`
 2. `skillsmanager fetch <skill-name> --agent claude`
 
-**User asks to share a skill they created:**
+**User asks to share a skill they created locally:**
 1. Ensure the skill directory has a `SKILL.md` with `name` and `description` in YAML frontmatter
 2. `skillsmanager add <path-to-skill-directory>`
 3. Fetch the skill to make it immediately available to the agent:
@@ -153,8 +191,24 @@ skillsmanager uninstall
 2. `skillsmanager registry push --backend gdrive`
 
 **User wants to store skills in a GitHub repo:**
-1. `skillsmanager collection create <name> --backend github --repo <owner/repo>` — creates the GitHub repo if needed, and auto-registers the collection in the existing registry (or creates a local registry if none exists)
+1. `skillsmanager collection create <name> --backend github --repo <owner/repo>` — creates the GitHub repo if needed, and auto-registers the collection
 2. `skillsmanager add <path> --collection <name>` — upload the skill into that collection
+
+**User wants to create a curated collection of skills from a public GitHub repo (cross-backend):**
+
+Use this when you want to expose skills from an external GitHub repo (e.g. `anthropics/skills`) via a collection the user can fetch from, without copying the files.
+
+1. `skillsmanager collection create <name> --backend gdrive --skills-repo <owner/skills-repo>`
+   - This creates the collection YAML in the user's Google Drive with `type: github` + `metadata.repo` pointing to the skills repo
+2. Register each skill by its path in the skills repo (no file upload needed):
+   ```bash
+   skillsmanager add --remote-path skills/write-tests/ --name write-tests --description "Generate unit tests" --collection <name>
+   ```
+3. Users fetch skills normally — `skillsmanager fetch write-tests --agent claude` — and the files are pulled from the skills repo
+
+**User wants to add a skill from a public GitHub repo without uploading files:**
+1. Create or identify a collection with `--skills-repo <owner/repo>`
+2. `skillsmanager add --remote-path <path-in-repo> --name <skill-name> --description "<desc>" --collection <name>`
 
 **User wants to discover GitHub-hosted collections:**
 1. `skillsmanager registry discover --backend github`
@@ -170,6 +224,19 @@ skillsmanager uninstall
 1. `skillsmanager registry remove-collection <name>` (removes reference only, data is kept)
 2. `skillsmanager registry remove-collection <name> --delete` (permanently deletes collection and skills)
 
+## Collection types
+
+Most collections store skill files directly in their backend. But a collection can also declare that skill files live in a different GitHub repo — this is useful for curating public skills or pointing to a shared library repo.
+
+| Collection backend | Skills repo | What `add` does | What `fetch` does |
+|---|---|---|---|
+| `gdrive` or `local` | (none) | Uploads files to Drive/local | Downloads from Drive/local |
+| `github` | (same repo as collection) | Commits files to the repo | Clones/pulls from repo |
+| `gdrive` or `local` | `--skills-repo owner/repo` | **Requires `--remote-path`** — registers a path pointer only | Downloads files from the GitHub repo |
+| `github` (registry repo) | `--skills-repo owner/skills-repo` | **Requires `--remote-path`** — registers a path pointer only | Downloads files from the skills repo |
+
+When you try to `skillsmanager add <local-path>` to a collection with a cross-backend skills repo, the command will fail with a clear error pointing you to `--remote-path`.
+
 ## Architecture
 
 - **Registry** (`SKILLS_REGISTRY.yaml`): root index pointing to all collections across backends
@@ -177,6 +244,7 @@ skillsmanager uninstall
 - **Backends**: `local` (default, `~/.skillsmanager/`), `gdrive` (Google Drive), and `github` (GitHub repo via `gh` CLI)
 - **Cache**: skills are cached at `~/.skillsmanager/cache/<uuid>/` and symlinked to agent directories
 - **Symlinks**: all agents share one cached copy — updating the cache updates all agents
+- **RoutingBackend**: transparent middleware that intercepts skill-file operations and dispatches to the right backend based on the collection's declared `type` field
 
 ## Scope
 

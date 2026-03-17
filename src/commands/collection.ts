@@ -18,7 +18,7 @@ export async function collectionCreateCommand(
   if (backendName === "github") {
     await createGithubCollection(name, options.repo, options.skillsRepo);
   } else {
-    await createGdriveCollection(name);
+    await createGdriveCollection(name, options.skillsRepo);
   }
 }
 
@@ -56,7 +56,7 @@ async function createGithubCollection(name?: string, repo?: string, skillsRepo?:
   }
 }
 
-async function createGdriveCollection(name?: string): Promise<void> {
+async function createGdriveCollection(name?: string, skillsRepo?: string): Promise<void> {
   const auth = await ensureAuth();
   const backend = new GDriveBackend(auth);
 
@@ -65,10 +65,16 @@ async function createGdriveCollection(name?: string): Promise<void> {
     ? `${PREFIX}MY_SKILLS`
     : name.startsWith(PREFIX) ? name : `${PREFIX}${name}`;
 
-  const spinner = ora(`Creating collection "${folderName}" in Google Drive...`).start();
+  const spinnerMsg = skillsRepo
+    ? `Creating collection "${folderName}" in Google Drive (skills source: ${skillsRepo})...`
+    : `Creating collection "${folderName}" in Google Drive...`;
+  const spinner = ora(spinnerMsg).start();
+
+  // Derive skill type from the skills-repo URL pattern (currently only github is supported)
+  const skillType = skillsRepo ? "github" : undefined;
 
   try {
-    const collection = await backend.createCollection(folderName);
+    const collection = await backend.createCollection(folderName, skillType, skillsRepo);
     spinner.succeed(`Collection "${folderName}" created in Google Drive`);
 
     const config = loadOrDefaultConfig();

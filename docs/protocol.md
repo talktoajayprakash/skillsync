@@ -75,6 +75,29 @@ skills:
     description: Generates unit tests for a given function or module
 ```
 
+**Optional: cross-backend skill source**
+
+A collection can declare that its skill files live in a different backend (e.g. a GitHub repo) by adding `type` and `metadata`:
+
+```yaml
+name: curated-skills
+owner: you@example.com
+type: github
+metadata:
+  repo: owner/skills-repo
+skills:
+  - name: write-tests
+    path: skills/write-tests/
+    description: Generates unit tests for a given function or module
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `type` | `github` | Skill files are fetched from a GitHub repo |
+| `metadata.repo` | `owner/repo` | The GitHub repo containing the skill files |
+
+When `type` is set, `skillsmanager fetch` downloads skill files from `metadata.repo` regardless of where the collection YAML lives (Drive, GitHub, local). When `type` is absent, skills are fetched from the same backend as the collection.
+
 {: .note }
 The legacy filename `SKILLS_SYNC.yaml` is still recognized for backwards compatibility.
 

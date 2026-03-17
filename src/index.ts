@@ -152,7 +152,7 @@ collection
   .description("Create a new collection (defaults to SKILLS_MY_SKILLS)")
   .option("--backend <backend>", "gdrive (default) or github", "gdrive")
   .option("--repo <owner/repo>", "GitHub repo to use (required for --backend github)")
-  .option("--skills-repo <owner/repo>", "GitHub repo where skills live (github backend only; defaults to --repo)")
+  .option("--skills-repo <owner/repo>", "GitHub repo where skills live; collection YAML stays in the declared backend")
   .action((name: string | undefined, options: { backend?: string; repo?: string; skillsRepo?: string }) =>
     collectionCreateCommand(name, options)
   );

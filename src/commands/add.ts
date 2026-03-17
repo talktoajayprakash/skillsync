@@ -91,16 +91,19 @@ export async function addCommand(
     return;
   }
 
-  // If the collection has metadata.repo (foreign skills repo), handle specially
-  if (collection.backend === "github") {
-    const github = new GithubBackend();
-    const col = await github.readCollection(collection);
+  // If the collection's skill type differs from its hosting backend, handle specially.
+  // col.type declares who handles skill files; col.metadata.repo gives the target repo.
+  {
+    const hostBackend = await resolveBackend(collection.backend);
+    const col = await hostBackend.readCollection(collection);
+    const skillType = col.type ?? collection.backend;
     const foreignRepo = col.metadata?.repo as string | undefined;
-    if (foreignRepo) {
+
+    if (skillType !== collection.backend && skillType === "github" && foreignRepo) {
       const ctx = GithubBackend.detectRepoContext(absPath);
       if (!ctx || ctx.repo !== foreignRepo) {
         console.log(chalk.red(
-          `This collection's skills source is "${foreignRepo}". ` +
+          `This collection's skills source is "${foreignRepo}" (type: ${skillType}). ` +
           `The provided path does not belong to that repo.\n` +
           chalk.dim(`  To register a skill by path without a local clone, use:\n`) +
           chalk.dim(`  skillsmanager add --collection ${collection.name} --remote-path <rel/path> --name <name> --description <desc>`)
@@ -113,7 +116,7 @@ export async function addCommand(
         const existing = col.skills.findIndex((s) => s.name === skillName);
         const entry = { name: skillName, path: ctx.relPath, description };
         if (existing >= 0) { col.skills[existing] = entry; } else { col.skills.push(entry); }
-        await github.writeCollection(collection, col);
+        await hostBackend.writeCollection(collection, col);
         trackSkill(skillName, collection.id, absPath);
         spinner.succeed(`${chalk.bold(skillName)} registered in ${collection.name} at ${chalk.dim(ctx.relPath)}`);
       } catch (err) {
@@ -164,16 +167,18 @@ async function addRemotePath(
     return;
   }
 
-  if (collection.backend !== "github") {
-    console.log(chalk.red("--remote-path is only supported for GitHub collections."));
+  const hostBackend = await resolveBackend(collection.backend);
+  const colForType = await hostBackend.readCollection(collection);
+  const skillType = colForType.type ?? collection.backend;
+  if (skillType !== "github" && collection.backend !== "github") {
+    console.log(chalk.red(`--remote-path is only supported for collections with type "github".`));
     return;
   }
 
-  const github = new GithubBackend();
   const spinner = ora(`Registering ${chalk.bold(skillName)} in ${collection.name} at ${chalk.dim(remotePath)}...`).start();
 
   try {
-    const col = await github.readCollection(collection);
+    const col = colForType;
     const existing = col.skills.findIndex((s) => s.name === skillName);
     const entry = { name: skillName, path: remotePath, description };
     if (existing >= 0) {
@@ -181,7 +186,7 @@ async function addRemotePath(
     } else {
       col.skills.push(entry);
     }
-    await github.writeCollection(collection, col);
+    await hostBackend.writeCollection(collection, col);
     spinner.succeed(`${chalk.bold(skillName)} registered in ${collection.name} at ${chalk.dim(remotePath)}`);
   } catch (err) {
     spinner.fail(`Failed: ${(err as Error).message}`);

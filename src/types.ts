@@ -10,8 +10,9 @@ export interface SkillEntry {
 export interface CollectionFile {
   name: string;
   owner: string;
+  type?: string;                          // skill-operations handler: "github", "local", etc. Omit = use collection's own backend
   skills: SkillEntry[];
-  metadata?: Record<string, unknown>; // backend-specific extras (e.g. github: { repo: "owner/repo" })
+  metadata?: Record<string, unknown>;     // type-specific config (e.g. for type "github": { repo: "owner/repo" })
 }
 
 export interface CollectionInfo {

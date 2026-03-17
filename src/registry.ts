@@ -20,6 +20,7 @@ export function parseCollection(content: string): CollectionFile {
       description: s.description ?? "",
     })),
   };
+  if (data.type) col.type = data.type;
   if (data.metadata && typeof data.metadata === "object") {
     col.metadata = data.metadata as Record<string, unknown>;
   }
@@ -30,12 +31,13 @@ export function serializeCollection(collection: CollectionFile): string {
   const obj: Record<string, unknown> = {
     name: collection.name,
     owner: collection.owner,
-    skills: collection.skills.map((s) => ({
-      name: s.name,
-      path: s.path,
-      description: s.description,
-    })),
   };
+  if (collection.type) obj.type = collection.type;
+  obj.skills = collection.skills.map((s) => ({
+    name: s.name,
+    path: s.path,
+    description: s.description,
+  }));
   if (collection.metadata && Object.keys(collection.metadata).length > 0) {
     obj.metadata = collection.metadata;
   }
