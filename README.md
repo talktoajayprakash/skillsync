@@ -11,7 +11,7 @@ You build skills for your AI agents, but keeping track of them is a mess. They'r
 
 Skills Manager fixes this. It gives every skill a home — in Google Drive, GitHub, or any storage backend you choose — and makes them instantly available to any agent via a single CLI command. Your agents can search, fetch, and use any skill regardless of where it lives.
 
-Build skills confidently, store them where you want, and sync them across every device and agent you work with — Claude, Cursor, OpenAI Codex, and beyond.
+Build skills confidently, store them where you want, and sync them across every device and agent you work with — Claude, Cursor, OpenAI Codex, OpenClaw, and beyond.
 
 ## Why Skills Manager?
 
@@ -24,9 +24,11 @@ Build skills confidently, store them where you want, and sync them across every 
 
 ## Supported Agents
 
-`claude` · `codex` · `cursor` · `windsurf` · `copilot` · `gemini` · `roo` · `agents`
+`claude` · `codex` · `cursor` · `windsurf` · `copilot` · `gemini` · `roo` · `openclaw` · `agents`
 
-> Any agent that reads from a skills directory works with Skills Manager — including OpenAI Codex and other third-party agents. If your agent can read a file, it can use your skills.
+> **OpenClaw users:** OpenClaw's skill system uses the same `SKILL.md` format and directory-based loading that Skills Manager is built around. Your OpenClaw skills are first-class citizens — store them in any backend, search them, and sync them across devices just like any other skill.
+>
+> Any agent that reads from a skills directory works with Skills Manager. If your agent can read a file, it can use your skills.
 
 ## Quick Start
 
