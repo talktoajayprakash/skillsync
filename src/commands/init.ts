@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { writeConfig, mergeCollections, readConfig } from "../config.js";
 import { ensureAuth } from "../auth.js";
-import { GDriveBackend } from "../backends/gdrive.js";
+import { resolveBackend } from "../backends/resolve.js";
 
 export async function initCommand(): Promise<void> {
   console.log(chalk.bold("\nSkills Manager Init\n"));
@@ -11,7 +11,7 @@ export async function initCommand(): Promise<void> {
   console.log(chalk.green("  ✓ Authenticated"));
 
   const spinner = ora("  Discovering collections...").start();
-  const backend = new GDriveBackend(auth);
+  const backend = await resolveBackend("gdrive");
   const fresh = await backend.discoverCollections();
   let existing: import("../types.js").CollectionInfo[] = [];
   try { existing = readConfig().collections; } catch { /* no existing config */ }
@@ -25,7 +25,7 @@ export async function initCommand(): Promise<void> {
     console.log(chalk.green(`  ✓ Found ${collections.length} collection(s):`));
     for (const c of collections) {
       const col = await backend.readCollection(c);
-      console.log(`    gdrive:${c.name}  (${col.skills.length} skills)`);
+      console.log(`    ${c.backend}:${c.name}  (${col.skills.length} skills)`);
     }
   }
 

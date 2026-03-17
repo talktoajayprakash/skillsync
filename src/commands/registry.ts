@@ -2,10 +2,6 @@ import chalk from "chalk";
 import ora from "ora";
 import fs from "fs";
 import { readConfig, writeConfig, mergeRegistries, CONFIG_PATH, CACHE_DIR } from "../config.js";
-import { ensureAuth } from "../auth.js";
-import { GDriveBackend } from "../backends/gdrive.js";
-import { GithubBackend } from "../backends/github.js";
-import { LocalBackend } from "../backends/local.js";
 import type { CollectionInfo, Config, RegistryInfo } from "../types.js";
 import { resolveBackend } from "../backends/resolve.js";
 
@@ -27,12 +23,7 @@ export async function registryCreateCommand(options: { backend?: string; repo?: 
   const label = backend === "local" ? "locally" : `in ${backend}`;
   const spinner = ora(`Creating registry ${label}...`).start();
   try {
-    let registry: RegistryInfo;
-    if (backend === "github") {
-      registry = await new GithubBackend().createRegistry(undefined, options.repo);
-    } else {
-      registry = await (await resolveBackend(backend)).createRegistry();
-    }
+    const registry = await (await resolveBackend(backend)).createRegistry({ repo: options.repo });
     spinner.succeed(`Registry created ${label}`);
 
     let config: Config = { registries: [], collections: [], skills: {}, discoveredAt: new Date().toISOString() };
@@ -45,7 +36,7 @@ export async function registryCreateCommand(options: { backend?: string; repo?: 
     if (backend !== "local") {
       const localReg = config.registries.find((r) => r.backend === "local");
       if (localReg) {
-        const local = new LocalBackend();
+        const local = await resolveBackend("local");
         try {
           const localData = await local.readRegistry(localReg);
           const localCollections = localData.collections.filter((c) => c.backend === "local");
@@ -288,7 +279,7 @@ export async function registryPushCommand(options: { backend?: string; repo?: st
     return;
   }
 
-  const local = new LocalBackend();
+  const local = await resolveBackend("local");
   const localData = await local.readRegistry(localReg);
   const localCollectionRefs = localData.collections.filter((c) => c.backend === "local");
 

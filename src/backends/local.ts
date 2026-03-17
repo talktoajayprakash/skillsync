@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import type { StorageBackend } from "./interface.js";
+import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import {
   parseCollection, serializeCollection,
@@ -86,11 +86,12 @@ export class LocalBackend implements StorageBackend {
     collection: CollectionInfo,
     localPath: string,
     skillName: string
-  ): Promise<void> {
+  ): Promise<string> {
     const dest = path.join(collection.folderId, skillName);
-    // If source and dest are the same, no-op
-    if (path.resolve(localPath) === path.resolve(dest)) return;
-    copyDirSync(localPath, dest);
+    if (path.resolve(localPath) !== path.resolve(dest)) {
+      copyDirSync(localPath, dest);
+    }
+    return `${skillName}/`;
   }
 
   async deleteCollection(collection: CollectionInfo): Promise<void> {
@@ -145,19 +146,15 @@ export class LocalBackend implements StorageBackend {
     };
   }
 
-  async createRegistry(name?: string): Promise<RegistryInfo> {
+  async createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo> {
+    const name = options?.name ?? "local";
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
     const owner = await this.getOwner();
-    const data: RegistryFile = {
-      name: name ?? "local",
-      owner,
-      source: "local",
-      collections: [],
-    };
+    const data: RegistryFile = { name, owner, source: "local", collections: [] };
     fs.writeFileSync(LOCAL_REGISTRY_PATH, serializeRegistryFile(data));
     return {
       id: randomUUID(),
-      name: name ?? "local",
+      name,
       backend: "local",
       folderId: CONFIG_DIR,
       fileId: LOCAL_REGISTRY_PATH,

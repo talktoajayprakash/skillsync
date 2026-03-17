@@ -3,7 +3,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { spawnSync } from "child_process";
 import chalk from "chalk";
-import type { StorageBackend } from "./interface.js";
+import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type {
   CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo,
 } from "../types.js";
@@ -285,7 +285,7 @@ export class GithubBackend implements StorageBackend {
 
   async uploadSkill(
     collection: CollectionInfo, localPath: string, skillName: string
-  ): Promise<void> {
+  ): Promise<string> {
     const { repo: hostRepo } = parseRef(collection.folderId);
     const workdir = this.ensureWorkdir(hostRepo);
     const resolvedLocal = path.resolve(localPath);
@@ -295,8 +295,8 @@ export class GithubBackend implements StorageBackend {
       resolvedLocal.startsWith(resolvedWorkdir + path.sep) ||
       resolvedLocal === resolvedWorkdir
     ) {
-      // Already in the repo — no copy needed
-      return;
+      // Already in the repo — no copy needed; return relative path from workdir
+      return path.relative(workdir, resolvedLocal).replace(/\\/g, "/");
     }
 
     // External skill: copy into .agentskills/<skillName>/ in the repo
@@ -304,6 +304,7 @@ export class GithubBackend implements StorageBackend {
     copyDirSync(localPath, dest);
     gitExec(["add", path.join(".agentskills", skillName)], workdir);
     await this.commitAndPush(workdir, `chore: add skill ${skillName}`);
+    return `.agentskills/${skillName}`;
   }
 
   async deleteCollection(collection: CollectionInfo): Promise<void> {
@@ -377,17 +378,18 @@ export class GithubBackend implements StorageBackend {
     return { name: ref.name, backend: "github", folderId: ref.ref };
   }
 
-  async createRegistry(name?: string, repoRef?: string): Promise<RegistryInfo> {
-    if (!repoRef) throw new Error("GitHub backend requires --repo <owner/repo>");
-    await this.ensureRepo(repoRef);
-    const workdir = this.ensureWorkdir(repoRef);
+  async createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo> {
+    const { name, repo } = options ?? {};
+    if (!repo) throw new Error("GitHub backend requires --repo <owner/repo>");
+    await this.ensureRepo(repo);
+    const workdir = this.ensureWorkdir(repo);
     const metaDir = SKILLSMANAGER_DIR;
     const filePath = path.join(workdir, metaDir, REGISTRY_FILENAME);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
     const owner = await this.getOwner();
     const registryData: RegistryFile = {
-      name: name ?? (repoRef.split("/")[1] ?? "default"),
+      name: name ?? (repo.split("/")[1] ?? "default"),
       owner,
       source: "github",
       collections: [],
@@ -400,8 +402,8 @@ export class GithubBackend implements StorageBackend {
       id: randomUUID(),
       name: registryData.name,
       backend: "github",
-      folderId: `${repoRef}:${metaDir}`,
-      fileId: `${repoRef}:${metaDir}/${REGISTRY_FILENAME}`,
+      folderId: `${repo}:${metaDir}`,
+      fileId: `${repo}:${metaDir}/${REGISTRY_FILENAME}`,
     };
   }
 
@@ -430,33 +432,6 @@ export class GithubBackend implements StorageBackend {
       backend: "github",
       folderId: `${repo}:${metaDir}`,
     };
-  }
-
-  // ── Static: detect if a path is inside a GitHub-tracked git repo ──────────────
-
-  static detectRepoContext(
-    absPath: string
-  ): { repo: string; repoRoot: string; relPath: string } | null {
-    const rootResult = spawnSync("git", ["-C", absPath, "rev-parse", "--show-toplevel"], {
-      encoding: "utf-8", stdio: "pipe",
-    });
-    if (rootResult.status !== 0) return null;
-    const repoRoot = rootResult.stdout.trim();
-
-    const remoteResult = spawnSync("git", ["-C", repoRoot, "remote", "get-url", "origin"], {
-      encoding: "utf-8", stdio: "pipe",
-    });
-    if (remoteResult.status !== 0) return null;
-    const remoteUrl = remoteResult.stdout.trim();
-
-    const match =
-      remoteUrl.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/) ??
-      remoteUrl.match(/github\.com\/([^/]+\/[^/]+)/);
-    if (!match) return null;
-
-    const repo = match[1].replace(/\.git$/, "");
-    const relPath = path.relative(repoRoot, absPath).replace(/\\/g, "/");
-    return { repo, repoRoot, relPath };
   }
 
 }

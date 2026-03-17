@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
-import type { StorageBackend } from "./interface.js";
+import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import {
   parseCollection, serializeCollection,
@@ -247,7 +247,7 @@ export class GDriveBackend implements StorageBackend {
     collection: CollectionInfo,
     localPath: string,
     skillName: string
-  ): Promise<void> {
+  ): Promise<string> {
     let folderId = await this.findFolder(skillName, collection.folderId);
     if (!folderId) {
       const res = await this.drive.files.create({
@@ -262,6 +262,7 @@ export class GDriveBackend implements StorageBackend {
     }
 
     await this.uploadFolder(localPath, folderId);
+    return `${skillName}/`;
   }
 
   // ── Registry operations ──────────────────────────────────────────────────
@@ -374,7 +375,8 @@ export class GDriveBackend implements StorageBackend {
     return null;
   }
 
-  async createRegistry(name?: string): Promise<RegistryInfo> {
+  async createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo> {
+    const name = options?.name;
     const folderName = name ? `SKILLS_REGISTRY_${name}` : "SKILLS_REGISTRY";
 
     const folderRes = await this.drive.files.create({

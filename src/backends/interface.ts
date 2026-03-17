@@ -6,6 +6,11 @@ export interface CreateCollectionOptions {
   skillsRepo?: string; // cross-repo skill source (all backends)
 }
 
+export interface CreateRegistryOptions {
+  name?: string;
+  repo?: string;       // required for github; ignored by others
+}
+
 export interface StorageBackend {
   // ── Identity ───────────────────────────────────────────────────────────────
   getOwner(): Promise<string>; // identity of the authenticated user (email, username, etc.)
@@ -15,7 +20,7 @@ export interface StorageBackend {
   readCollection(collection: CollectionInfo): Promise<CollectionFile>;
   writeCollection(collection: CollectionInfo, data: CollectionFile): Promise<void>;
   downloadSkill(collection: CollectionInfo, skillName: string, destDir: string): Promise<void>;
-  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void>;
+  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<string>;
 
   deleteCollection(collection: CollectionInfo): Promise<void>;
   deleteSkill(collection: CollectionInfo, skillName: string): Promise<void>;
@@ -25,6 +30,6 @@ export interface StorageBackend {
   readRegistry(registry: RegistryInfo): Promise<RegistryFile>;
   writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void>;
   resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id"> | null>;
-  createRegistry(name?: string): Promise<RegistryInfo>;
+  createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo>;
   createCollection(options: CreateCollectionOptions): Promise<CollectionInfo>;
 }

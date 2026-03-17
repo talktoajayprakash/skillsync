@@ -1,4 +1,4 @@
-import type { CreateCollectionOptions, StorageBackend } from "./interface.js";
+import type { CreateCollectionOptions, CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import { GithubBackend } from "./github.js";
 
@@ -60,8 +60,8 @@ export class RoutingBackend implements StorageBackend {
     return this.inner.resolveCollectionRef(ref);
   }
 
-  createRegistry(name?: string): Promise<RegistryInfo> {
-    return this.inner.createRegistry(name);
+  createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo> {
+    return this.inner.createRegistry(options);
   }
 
   createCollection(options: CreateCollectionOptions): Promise<CollectionInfo> {
@@ -86,7 +86,7 @@ export class RoutingBackend implements StorageBackend {
     return this.inner.downloadSkill(collection, skillName, destDir);
   }
 
-  async uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void> {
+  async uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<string> {
     const col = await this.inner.readCollection(collection);
     const skillType = col.type ?? collection.backend;
 
@@ -114,6 +114,7 @@ export class RoutingBackend implements StorageBackend {
 
     return this.inner.uploadSkill(collection, localPath, skillName);
   }
+
 
   async deleteSkill(collection: CollectionInfo, skillName: string): Promise<void> {
     const col = await this.inner.readCollection(collection);

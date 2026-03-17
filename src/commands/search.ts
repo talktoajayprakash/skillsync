@@ -39,7 +39,7 @@ export async function searchCommand(query: string): Promise<void> {
 
     for (const s of ranked) {
       console.log(
-        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`gdrive:${s.collection.name}`)}`
+        `  ${chalk.cyan(s.entry.name.padEnd(maxName + 2))}${s.entry.description.padEnd(maxDesc + 2)}${chalk.dim(`${s.collection.backend}:${s.collection.name}`)}`
       );
     }
 

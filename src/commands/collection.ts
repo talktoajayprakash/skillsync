@@ -3,7 +3,6 @@ import ora from "ora";
 import fs from "fs";
 import { writeConfig, CONFIG_PATH, readConfig } from "../config.js";
 import type { Config, CollectionInfo, RegistryInfo } from "../types.js";
-import { LocalBackend } from "../backends/local.js";
 import { resolveBackend } from "../backends/resolve.js";
 
 export async function collectionCreateCommand(
@@ -66,7 +65,7 @@ async function ensureRegistry(config: Config): Promise<RegistryInfo> {
   if (config.registries.length > 0) return config.registries[0];
 
   console.log(chalk.dim("  No registry found — creating a local registry..."));
-  const local = new LocalBackend();
+  const local = await resolveBackend("local");
   const registry = await local.createRegistry();
   config.registries.push(registry);
   console.log(chalk.green("  ✓ Local registry created"));
