@@ -2,8 +2,8 @@ name: Release & Publish
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -15,9 +15,6 @@ jobs:
     environment: release
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -30,17 +27,8 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Bump patch version
-        id: version
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          NEW_VERSION=$(npm version patch --no-git-tag-version)
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          git add package.json package-lock.json
-          git commit -m "chore: release $NEW_VERSION [skip ci]"
-          git tag "$NEW_VERSION"
-          git push origin main --tags
+      - name: Set version from tag
+        run: npm version ${GITHUB_REF_NAME} --no-git-tag-version --allow-same-version
 
       - name: Build
         run: npm run build
@@ -49,8 +37,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create ${{ steps.version.outputs.new_version }} \
-            --title "${{ steps.version.outputs.new_version }}" \
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
             --generate-notes
 
       - name: Publish to npm
