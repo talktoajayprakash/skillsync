@@ -4,7 +4,11 @@ import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
 import { TOKEN_PATH, ensureConfigDir, readCredentials, credentialsExist } from "./config.js";
 
-const SCOPES = ["https://www.googleapis.com/auth/drive"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/drive",
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+];
 const LOOPBACK_PORT = 3847;
 const REDIRECT_URI = `http://localhost:${LOOPBACK_PORT}`;
 
@@ -32,6 +36,8 @@ function waitForAuthCode(): Promise<string> {
       if (error) {
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end("<h2>Authorization failed.</h2><p>You can close this tab.</p>");
+        res.socket?.destroy();
+        server.closeAllConnections?.();
         server.close();
         reject(new Error(`OAuth error: ${error}`));
         return;
@@ -40,6 +46,8 @@ function waitForAuthCode(): Promise<string> {
       if (code) {
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end("<h2>Authorization successful!</h2><p>You can close this tab and return to the terminal.</p>");
+        res.socket?.destroy();
+        server.closeAllConnections?.();
         server.close();
         resolve(code);
       } else {
@@ -69,8 +77,17 @@ export async function runAuthFlow(): Promise<OAuth2Client> {
   const { tokens } = await client.getToken(code);
   client.setCredentials(tokens);
   saveToken(client);
-  console.log("Authorization successful.");
   return client;
+}
+
+export async function getAuthedEmail(client: OAuth2Client): Promise<string | null> {
+  try {
+    const oauth2 = google.oauth2({ version: "v2", auth: client });
+    const res = await oauth2.userinfo.get();
+    return res.data.email ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function getAuthClient(): OAuth2Client {

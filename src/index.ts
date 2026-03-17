@@ -14,9 +14,11 @@ import { updateCommand } from "./commands/update.js";
 import { refreshCommand } from "./commands/refresh.js";
 import { setupGoogleCommand } from "./commands/setup/google.js";
 import { setupGithubCommand } from "./commands/setup/github.js";
+import { logoutGoogleCommand, logoutGithubCommand } from "./commands/logout.js";
 import { collectionCreateCommand } from "./commands/collection.js";
 import { skillDeleteCommand } from "./commands/skill.js";
 import { installCommand, uninstallCommand } from "./commands/install.js";
+import { statusCommand } from "./commands/status.js";
 import {
   registryCreateCommand, registryListCommand, registryDiscoverCommand,
   registryAddCollectionCommand, registryRemoveCollectionCommand, registryPushCommand,
@@ -55,7 +57,29 @@ setup
   .description("One-time GitHub setup — checks gh CLI and runs gh auth login")
   .action(setupGithubCommand);
 
+// ── Logout ───────────────────────────────────────────────────────────────────
+
+const logout = program
+  .command("logout")
+  .description("Log out of a storage backend");
+
+logout
+  .command("google")
+  .description("Clear Google OAuth session (and optionally credentials)")
+  .option("--all", "Also remove credentials.json to start setup from scratch")
+  .action((options: { all?: boolean }) => logoutGoogleCommand(options));
+
+logout
+  .command("github")
+  .description("Log out of GitHub (runs gh auth logout)")
+  .action(logoutGithubCommand);
+
 // ── Core commands ────────────────────────────────────────────────────────────
+
+program
+  .command("status")
+  .description("Show login status and identity for each backend")
+  .action(statusCommand);
 
 program
   .command("init")
@@ -166,7 +190,8 @@ registry
   .command("remove-collection <name>")
   .description("Remove a collection reference from the registry")
   .option("--delete", "Also delete the collection and all its skills from the backend")
-  .action((name: string, options: { delete?: boolean }) =>
+  .option("--backend <backend>", "Backend the collection lives on (local, gdrive, github)")
+  .action((name: string, options: { delete?: boolean; backend?: string }) =>
     registryRemoveCollectionCommand(name, options)
   );
 

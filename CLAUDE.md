@@ -1,6 +1,6 @@
 # Skills Manager — Agent Guide
 
-Skills Manager is a CLI tool for storing and fetching agent skills from local or remote storage (Google Drive).
+Skills Manager is a CLI tool for storing and fetching agent skills from local or remote storage (Google Drive). Implemented backends: `local`, `gdrive`, `github`.
 
 For a full understanding of the design, decisions, and architecture read **[WRITEUP.md](./WRITEUP.md)** and **[docs/registry-architecture.md](./docs/registry-architecture.md)**.
 

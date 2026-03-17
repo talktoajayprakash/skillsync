@@ -5,7 +5,7 @@ import readline from "readline";
 import { execSync, spawnSync } from "child_process";
 import chalk from "chalk";
 import { CREDENTIALS_PATH, TOKEN_PATH, ensureConfigDir } from "../../config.js";
-import { runAuthFlow, hasToken } from "../../auth.js";
+import { runAuthFlow, hasToken, getAuthedEmail } from "../../auth.js";
 import { credentialsExist } from "../../config.js";
 
 // ─── Prompt helpers ──────────────────────────────────────────────────────────
@@ -160,8 +160,9 @@ export async function setupGoogleCommand(): Promise<void> {
       return;
     }
     console.log(chalk.yellow("  ✗ Not yet authenticated — starting OAuth flow...\n"));
-    await runAuthFlow();
-    console.log(chalk.green("\n  ✓ Authenticated successfully."));
+    const client = await runAuthFlow();
+    const authedEmail = await getAuthedEmail(client);
+    console.log(chalk.green(`\n  ✓ Authenticated successfully${authedEmail ? ` as ${chalk.white(authedEmail)}` : ""}.`));
     console.log(`\nRun ${chalk.bold("skillsmanager init")} to discover registries.\n`);
     return;
   }
@@ -220,36 +221,62 @@ export async function setupGoogleCommand(): Promise<void> {
   const projectId = await selectOrCreateProject();
   if (!projectId) return;
 
-  // ── Enable Drive API ──────────────────────────────────────────────────────
-  console.log(chalk.bold("\nStep 4 — Enable Google Drive API\n"));
+  // ── Enable APIs ───────────────────────────────────────────────────────────
+  console.log(chalk.bold("\nStep 4 — Enable Required APIs\n"));
 
-  const DRIVE_API = "drive.googleapis.com";
-  if (apiEnabled(projectId, DRIVE_API)) {
-    console.log(chalk.green("  ✓ Google Drive API already enabled"));
-  } else {
-    const ok = enableApi(projectId, DRIVE_API);
-    if (ok) {
-      console.log(chalk.green("  ✓ Google Drive API enabled"));
+  const REQUIRED_APIS: { api: string; label: string }[] = [
+    { api: "drive.googleapis.com", label: "Google Drive API" },
+  ];
+
+  for (const { api, label } of REQUIRED_APIS) {
+    if (apiEnabled(projectId, api)) {
+      console.log(chalk.green(`  ✓ ${label} already enabled`));
     } else {
-      console.log(chalk.red("  Failed to enable Google Drive API. Check that billing is set up for the project."));
-      return;
+      const ok = enableApi(projectId, api);
+      if (ok) {
+        console.log(chalk.green(`  ✓ ${label} enabled`));
+      } else {
+        console.log(chalk.red(`  Failed to enable ${label}. Check that billing is set up for the project.`));
+        return;
+      }
     }
   }
 
+  // ── Configure OAuth Consent Screen ────────────────────────────────────────
+  console.log(chalk.bold("\nStep 5 — Configure OAuth Consent Screen\n"));
+  console.log("  Before creating credentials, Google requires you to configure the");
+  console.log("  OAuth consent screen (the login screen your users will see).\n");
+  console.log(`  ${chalk.yellow("Note:")} Personal Google accounts can only create ${chalk.white("External")} apps.`);
+  console.log(`  External apps start in Testing mode — only test users you add can sign in.\n`);
+
+  const consentUrl = `https://console.cloud.google.com/apis/credentials/consent?project=${projectId}`;
+  console.log(`  URL: ${chalk.cyan(consentUrl)}\n`);
+  console.log(chalk.dim("  Instructions:"));
+  console.log(chalk.dim(`    1. Audience → select ${chalk.white("External")} (required for personal accounts)`));
+  console.log(chalk.dim(`    2. App name → ${chalk.white("Skills Manager")}`));
+  console.log(chalk.dim(`    3. User support email → ${chalk.white(account)}`));
+  console.log(chalk.dim(`    4. Contact email → ${chalk.white(account)}`));
+  console.log(chalk.dim(`    5. Click "Create"`));
+  console.log(chalk.dim(`    6. Scroll to "Test users" → "Add users" → enter ${chalk.white(account)} → Save\n`));
+
+  openUrl(consentUrl);
+
+  await ask("Press Enter once you have configured the consent screen and added yourself as a test user...");
+
   // ── OAuth credentials (browser) ───────────────────────────────────────────
-  console.log(chalk.bold("\nStep 5 — Create OAuth 2.0 Credentials\n"));
-  console.log("  Google does not allow creating OAuth client credentials from the CLI.");
-  console.log("  Opening the Google Cloud Console to create them...\n");
+  console.log(chalk.bold("\nStep 6 — Create OAuth 2.0 Credentials\n"));
+  console.log("  Now create the OAuth client ID that Skills Manager will use to authenticate.");
+  console.log("  Opening the Google Cloud Console...\n");
 
   const credentialsUrl =
     `https://console.cloud.google.com/apis/credentials/oauthclient?project=${projectId}`;
 
   console.log(`  URL: ${chalk.cyan(credentialsUrl)}\n`);
   console.log(chalk.dim("  Instructions:"));
-  console.log(chalk.dim("    1. Application type → Desktop app"));
-  console.log(chalk.dim('    2. Name → "Skills Manager" (or anything)'));
-  console.log(chalk.dim('    3. Click "Create" → then "Download JSON"'));
-  console.log(chalk.dim("    4. Note where the file is saved\n"));
+  console.log(chalk.dim(`    1. Application type → ${chalk.white("Desktop app")}`));
+  console.log(chalk.dim(`    2. Name → ${chalk.white("Skills Manager")} (or anything)`));
+  console.log(chalk.dim(`    3. Click "Create" → then "Download JSON"`));
+  console.log(chalk.dim(`    4. Save the file (it will land in your Downloads folder)\n`));
 
   openUrl(credentialsUrl);
 
@@ -291,25 +318,11 @@ export async function setupGoogleCommand(): Promise<void> {
   fs.copyFileSync(credSrc, CREDENTIALS_PATH);
   console.log(chalk.green(`\n  ✓ Credentials saved to ~/.skillsmanager/credentials.json`));
 
-  // ── Add test user ─────────────────────────────────────────────────────────
-  console.log(chalk.bold("\nStep 6 — Add Test User\n"));
-  console.log("  Your app is in Testing mode. You must add your Google account as a test user.");
-  console.log("  Opening the OAuth consent screen...\n");
-  console.log(chalk.dim("  Instructions:"));
-  console.log(chalk.dim("    1. Scroll down to \"Test users\""));
-  console.log(chalk.dim(`    2. Click \"Add users\" → enter ${chalk.white(account)}`));
-  console.log(chalk.dim("    3. Click \"Save\"\n"));
-
-  const consentUrl = `https://console.cloud.google.com/apis/credentials/consent?project=${projectId}`;
-  console.log(`  URL: ${chalk.cyan(consentUrl)}\n`);
-  openUrl(consentUrl);
-
-  await ask("Press Enter once you have added your email as a test user...");
-
   // ── OAuth flow ────────────────────────────────────────────────────────────
   console.log(chalk.bold("\nStep 7 — Authorize Skills Manager\n"));
-  await runAuthFlow();
-  console.log(chalk.green("\n  ✓ Setup complete!"));
+  const client = await runAuthFlow();
+  const authedEmail = await getAuthedEmail(client);
+  console.log(chalk.green(`\n  ✓ Setup complete! Authenticated as ${chalk.white(authedEmail ?? account)}`));
   console.log(`\nRun ${chalk.bold("skillsmanager init")} to discover your registries.\n`);
 }
 
@@ -319,10 +332,15 @@ function printManualInstructions(): void {
   console.log("  2. Create a project (or select an existing one)");
   console.log("  3. Enable the Google Drive API:");
   console.log("       APIs & Services → Library → search \"Google Drive API\" → Enable");
-  console.log("  4. Create OAuth credentials:");
+  console.log("  4. Configure the OAuth consent screen:");
+  console.log("       APIs & Services → OAuth consent screen");
+  console.log("       Audience: External (required for personal Google accounts)");
+  console.log("       Fill in App name, support email, and contact email");
+  console.log("       Under \"Test users\", add your own Google account email");
+  console.log("  5. Create OAuth credentials:");
   console.log("       APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID");
   console.log("       Application type: Desktop app");
-  console.log("  5. Download the JSON and save it:");
+  console.log("  6. Download the JSON and save it:");
   console.log(chalk.cyan(`       ~/.skillsmanager/credentials.json`));
   console.log(`\n  Then run: ${chalk.bold("skillsmanager setup google")}\n`);
 }

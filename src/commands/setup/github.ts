@@ -3,12 +3,19 @@ import chalk from "chalk";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function ghInstalled(): boolean {
+export function ghInstalled(): boolean {
   return spawnSync("gh", ["--version"], { stdio: "pipe" }).status === 0;
 }
 
-function ghAuthed(): boolean {
+export function ghAuthed(): boolean {
   return spawnSync("gh", ["auth", "status"], { stdio: "pipe" }).status === 0;
+}
+
+export function ghGetLogin(): string {
+  const r = spawnSync("gh", ["api", "user", "--jq", ".login"], {
+    encoding: "utf-8", stdio: "pipe",
+  });
+  return r.status === 0 ? (r.stdout?.trim() ?? "") : "";
 }
 
 async function installGh(): Promise<boolean> {

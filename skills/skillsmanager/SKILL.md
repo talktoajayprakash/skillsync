@@ -126,6 +126,9 @@ skillsmanager uninstall
 **User asks to share a skill they created:**
 1. Ensure the skill directory has a `SKILL.md` with `name` and `description` in YAML frontmatter
 2. `skillsmanager add <path-to-skill-directory>`
+3. Fetch the skill to make it immediately available to the agent:
+   - For all projects: `skillsmanager fetch <skill-name> --agent claude`
+   - For current project only: `skillsmanager fetch <skill-name> --agent claude --scope project`
 
 **User asks to update a skill:**
 1. Edit the skill files locally

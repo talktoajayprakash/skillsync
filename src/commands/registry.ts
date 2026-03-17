@@ -148,7 +148,7 @@ export async function registryAddCollectionCommand(
 
 export async function registryRemoveCollectionCommand(
   collectionName: string,
-  options: { delete?: boolean }
+  options: { delete?: boolean; backend?: string }
 ): Promise<void> {
   let config: Config;
   try { config = readConfig(); } catch {
@@ -161,13 +161,33 @@ export async function registryRemoveCollectionCommand(
     return;
   }
 
-  const reg = config.registries[0];
-  const backend = await resolveBackend(reg.backend);
+  // Search all registries for the collection; prefer one matching --backend if given
+  let reg = config.registries[0];
+  let data: Awaited<ReturnType<Awaited<ReturnType<typeof resolveBackend>>["readRegistry"]>> | null = null;
+  let backend = await resolveBackend(reg.backend);
 
-  const data = await backend.readRegistry(reg);
-  const ref = data.collections.find((c) => c.name === collectionName);
+  for (const r of config.registries) {
+    if (options.backend && r.backend !== options.backend) continue;
+    try {
+      const b = await resolveBackend(r.backend);
+      const d = await b.readRegistry(r);
+      if (d.collections.find((c) => c.name === collectionName)) {
+        reg = r;
+        backend = b;
+        data = d;
+        break;
+      }
+    } catch { /* skip unreadable registries */ }
+  }
+
+  if (!data) {
+    // Fall back to reading the first (or backend-matched) registry for the error message
+    try { data = await backend.readRegistry(reg); } catch { /**/ }
+  }
+
+  const ref = data?.collections.find((c) => c.name === collectionName);
   if (!ref) {
-    console.log(chalk.yellow(`Collection "${collectionName}" not found in registry.`));
+    console.log(chalk.yellow(`Collection "${collectionName}" not found in any registry.`));
     return;
   }
 
@@ -197,8 +217,8 @@ export async function registryRemoveCollectionCommand(
   }
 
   // Remove ref from registry
-  data.collections = data.collections.filter((c) => c.name !== collectionName);
-  await backend.writeRegistry(reg, data);
+  data!.collections = data!.collections.filter((c) => c.name !== collectionName);
+  await backend.writeRegistry(reg, data!);
 
   // Remove from local config — capture ID before removal for skills cleanup
   const removedColId = config.collections.find((c) => c.name === collectionName)?.id;
