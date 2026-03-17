@@ -7,11 +7,12 @@
 
 **One command to share, discover, and install AI agent skills — across every agent you use.**
 
-AI agent skills are powerful, but they're stuck on the machine where you created them. Skills Manager solves this by storing your skills in Google Drive and letting you install them into any supported agent with a single command. Write a skill once, use it everywhere.
+AI agent skills are powerful, but they're stuck on the machine where you created them. Skills Manager solves this by storing your skills in remote storage — Google Drive, GitHub, Dropbox, AWS S3, and more — and letting you install them into any supported agent with a single command. Write a skill once, use it everywhere.
 
 ## Why Skills Manager?
 
 - **Cross-agent** — install any skill into Claude, Cursor, Windsurf, Copilot, Gemini, and more
+- **Backend-agnostic** — store skills in Google Drive, GitHub, Dropbox, AWS S3, or local filesystem
 - **No duplication** — skills are cached once locally and symlinked into agent directories
 - **Searchable** — full-text BM25 search across all your skills and collections
 - **Git-friendly** — plain Markdown files, easy to version-control and share
