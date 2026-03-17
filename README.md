@@ -26,7 +26,7 @@ AI agent skills are powerful, but they're stuck on the machine where you created
 ### 1. Install
 
 ```bash
-npm install -g skillsmanager
+npm install -g @skillsmanager/cli
 ```
 
 ### 2. Install the skillsmanager skill (lets your agent drive Skills Manager)
