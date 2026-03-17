@@ -57,6 +57,16 @@ skillsmanager update <path> --collection <name>
 
 After updating, the local cache is refreshed so all symlinks on this machine reflect the change immediately.
 
+### Delete a skill
+
+```bash
+# Delete a skill from its collection (removes from backend, cache, and index)
+skillsmanager skill delete <name>
+
+# If the skill exists in multiple collections, specify which one
+skillsmanager skill delete <name> --collection <collection-name>
+```
+
 ### Registry and collection management
 
 ```bash
@@ -130,6 +140,10 @@ skillsmanager uninstall
 
 **User wants to see what registries and collections exist:**
 1. `skillsmanager registry list`
+
+**User asks to delete/remove a single skill:**
+1. `skillsmanager skill delete <skill-name>`
+2. If the skill lives in multiple collections, add `--collection <name>` to target the right one
 
 **User wants to remove a collection:**
 1. `skillsmanager registry remove-collection <name>` (removes reference only, data is kept)

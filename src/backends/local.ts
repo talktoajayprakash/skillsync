@@ -99,6 +99,13 @@ export class LocalBackend implements StorageBackend {
     }
   }
 
+  async deleteSkill(collection: CollectionInfo, skillName: string): Promise<void> {
+    const skillPath = path.join(collection.folderId, skillName);
+    if (fs.existsSync(skillPath)) {
+      fs.rmSync(skillPath, { recursive: true, force: true });
+    }
+  }
+
   // ── Registry operations ──────────────────────────────────────────────────
 
   async discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]> {

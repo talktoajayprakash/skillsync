@@ -12,6 +12,7 @@ export interface StorageBackend {
   uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void>;
 
   deleteCollection(collection: CollectionInfo): Promise<void>;
+  deleteSkill(collection: CollectionInfo, skillName: string): Promise<void>;
 
   // ── Registry operations (new) ────────────────────────────────────────────
   discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]>;

@@ -15,6 +15,7 @@ import { refreshCommand } from "./commands/refresh.js";
 import { setupGoogleCommand } from "./commands/setup/google.js";
 import { setupGithubCommand } from "./commands/setup/github.js";
 import { collectionCreateCommand } from "./commands/collection.js";
+import { skillDeleteCommand } from "./commands/skill.js";
 import { installCommand, uninstallCommand } from "./commands/install.js";
 import {
   registryCreateCommand, registryListCommand, registryDiscoverCommand,
@@ -100,6 +101,18 @@ program
   .command("refresh")
   .description("Re-discover collections from storage")
   .action(refreshCommand);
+
+// ── Skill ────────────────────────────────────────────────────────────────────
+
+const skill = program
+  .command("skill")
+  .description("Manage individual skills");
+
+skill
+  .command("delete <name>")
+  .description("Delete a single skill from a collection")
+  .option("--collection <name>", "Collection to delete from (required if skill is in multiple)")
+  .action((name: string, options: { collection?: string }) => skillDeleteCommand(name, options));
 
 // ── Collection ───────────────────────────────────────────────────────────────
 

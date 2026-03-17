@@ -238,6 +238,13 @@ export class GDriveBackend implements StorageBackend {
     });
   }
 
+  async deleteSkill(collection: CollectionInfo, skillName: string): Promise<void> {
+    const folderId = await this.findFolder(skillName, collection.folderId);
+    if (folderId) {
+      await this.drive.files.update({ fileId: folderId, requestBody: { trashed: true } });
+    }
+  }
+
   async uploadSkill(
     collection: CollectionInfo,
     localPath: string,

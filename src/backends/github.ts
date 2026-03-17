@@ -292,6 +292,19 @@ export class GithubBackend implements StorageBackend {
     await this.commitAndPush(workdir, `chore: remove collection ${collection.name}`);
   }
 
+  async deleteSkill(collection: CollectionInfo, skillName: string): Promise<void> {
+    const { repo } = parseRef(collection.folderId);
+    const workdir = this.ensureWorkdir(repo);
+    const col = await this.readCollection(collection);
+    const entry = col.skills.find((s) => s.name === skillName);
+    if (!entry) return;
+    const skillPath = path.join(workdir, entry.path);
+    if (!fs.existsSync(skillPath)) return;
+    fs.rmSync(skillPath, { recursive: true, force: true });
+    gitExec(["add", "-A"], workdir);
+    await this.commitAndPush(workdir, `chore: remove skill ${skillName}`);
+  }
+
   // ── Registry operations ───────────────────────────────────────────────────────
 
   async discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]> {
