@@ -1,8 +1,10 @@
+import os from "os";
+import path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import { readConfig } from "../config.js";
 import { resolveBackend } from "../backends/resolve.js";
-import type { CollectionInfo, RegistryInfo, SkillEntry, ResolvedSkill } from "../types.js";
+import type { CollectionInfo, RegistryInfo, SkillEntry, SkillIndex, ResolvedSkill } from "../types.js";
 
 export async function getAllSkills(): Promise<ResolvedSkill[]> {
   const config = readConfig();
@@ -19,9 +21,36 @@ export async function getAllSkills(): Promise<ResolvedSkill[]> {
   return allSkills;
 }
 
+function collectionTag(col: CollectionInfo): string {
+  if (col.backend === "github") {
+    const repo = col.folderId.split(":")[0];
+    return `[github: ${repo}]`;
+  }
+  return `[${col.backend}]`;
+}
+
+const HOME = os.homedir();
+
+function shortenPath(p: string): string {
+  return p.startsWith(HOME) ? "~" + p.slice(HOME.length) : p;
+}
+
+function installedPaths(skillName: string, collectionId: string, skillIndex: SkillIndex): string[] {
+  const entries = skillIndex[skillName] ?? [];
+  const paths: string[] = [];
+  for (const entry of entries) {
+    if (entry.collectionId !== collectionId) continue;
+    for (const p of entry.installedAt) {
+      paths.push(shortenPath(p));
+    }
+  }
+  return paths;
+}
+
 function renderCollections(
   cols: CollectionInfo[],
-  collectionSkills: Map<string, SkillEntry[]>
+  collectionSkills: Map<string, SkillEntry[]>,
+  skillIndex: SkillIndex
 ): void {
   for (let ci = 0; ci < cols.length; ci++) {
     const col = cols[ci];
@@ -30,7 +59,7 @@ function renderCollections(
     const childPad = isLastCol ? "    " : "│   ";
 
     console.log(
-      `${colBranch} ${chalk.bold.yellow(col.name)} ${chalk.dim(`[${col.backend}]`)}`
+      `${colBranch} ${chalk.bold.yellow(col.name)} ${chalk.dim(collectionTag(col))}`
     );
 
     const skills = (collectionSkills.get(col.id) ?? []).sort((a, b) =>
@@ -41,9 +70,14 @@ function renderCollections(
       const skill = skills[si];
       const isLastSkill = si === skills.length - 1;
       const skillBranch = isLastSkill ? "└──" : "├──";
+      const paths = installedPaths(skill.name, col.id, skillIndex);
       console.log(
         `${childPad}${skillBranch} ${chalk.cyan(skill.name)}  ${chalk.dim(skill.description)}`
       );
+      if (paths.length > 0) {
+        const installPad = childPad + (isLastSkill ? "    " : "│   ");
+        console.log(`${installPad}${chalk.magenta(`(${paths.join(", ")})`)}`)
+      }
     }
   }
 }
@@ -97,7 +131,7 @@ export async function listCommand(): Promise<void> {
       console.log(
         `${chalk.bold.white(reg.name)}  ${chalk.dim(`${reg.backend}`)}`
       );
-      renderCollections(cols, collectionSkills);
+      renderCollections(cols, collectionSkills, config.skills);
       console.log();
     }
 
@@ -107,7 +141,7 @@ export async function listCommand(): Promise<void> {
       console.log(
         `${chalk.bold.white("(unregistered)")}  ${chalk.dim("run 'skillsmanager refresh' to link to a registry")}`
       );
-      renderCollections(orphans, collectionSkills);
+      renderCollections(orphans, collectionSkills, config.skills);
       console.log();
     }
   } catch (err) {

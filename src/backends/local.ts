@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
+import type { BackendStatus, CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import {
   parseCollection, serializeCollection,
@@ -27,6 +27,10 @@ export class LocalBackend implements StorageBackend {
       if (data.owner) return data.owner;
     }
     return process.env.USER ?? process.env.USERNAME ?? "unknown";
+  }
+
+  async getStatus(): Promise<BackendStatus> {
+    return { loggedIn: true, identity: await this.getOwner() };
   }
 
   // ── Collection operations ────────────────────────────────────────────────

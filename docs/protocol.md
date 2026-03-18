@@ -183,22 +183,33 @@ This means `registry add-collection` is never a required follow-up step. It exis
 Every backend implements this interface. Skills Manager is backend-agnostic — the protocol layer never calls backend-specific code directly.
 
 ```typescript
+interface BackendStatus {
+  loggedIn: boolean;
+  identity: string;   // email/username, or "" when not logged in
+  hint?: string;      // shown when loggedIn=false
+}
+
 interface StorageBackend {
   // Identity
   getOwner(): Promise<string>;
+  getStatus(): Promise<BackendStatus>;
 
   // Collections
+  discoverCollections(): Promise<Omit<CollectionInfo, "id">[]>;
   readCollection(collection: CollectionInfo): Promise<CollectionFile>;
   writeCollection(collection: CollectionInfo, data: CollectionFile): Promise<void>;
+  deleteCollection(collection: CollectionInfo): Promise<void>;
   downloadSkill(collection: CollectionInfo, skillName: string, destDir: string): Promise<void>;
-  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void>;
+  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<string>;
+  deleteSkill(collection: CollectionInfo, skillName: string): Promise<void>;
 
   // Registries
   discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]>;
   readRegistry(registry: RegistryInfo): Promise<RegistryFile>;
   writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void>;
-  resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id">>;
-  createRegistry(name: string): Promise<Omit<RegistryInfo, "id">>;
+  resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id"> | null>;
+  createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo>;
+  createCollection(options: CreateCollectionOptions): Promise<CollectionInfo>;
 }
 ```
 

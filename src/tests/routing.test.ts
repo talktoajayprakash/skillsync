@@ -32,6 +32,7 @@ function makeCollectionFile(overrides: Partial<CollectionFile> = {}): Collection
 function mockInner(col: CollectionFile): StorageBackend {
   return {
     getOwner: vi.fn().mockResolvedValue("owner"),
+    getStatus: vi.fn().mockResolvedValue({ loggedIn: true, identity: "owner" }),
     discoverCollections: vi.fn().mockResolvedValue([]),
     readCollection: vi.fn().mockResolvedValue(col),
     writeCollection: vi.fn().mockResolvedValue(undefined),
@@ -123,6 +124,13 @@ describe("RoutingBackend pass-through", () => {
     const result = await new RoutingBackend(inner).getOwner();
     expect(inner.getOwner).toHaveBeenCalled();
     expect(result).toBe("owner");
+  });
+
+  it("getStatus delegates to inner", async () => {
+    const inner = mockInner(makeCollectionFile());
+    const result = await new RoutingBackend(inner).getStatus();
+    expect(inner.getStatus).toHaveBeenCalled();
+    expect(result).toEqual({ loggedIn: true, identity: "owner" });
   });
 });
 

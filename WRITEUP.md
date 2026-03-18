@@ -314,22 +314,39 @@ skillsmanager add --remote-path skills/write-tests/ --name write-tests \
 The `StorageBackend` interface is the only contract backends must implement:
 
 ```typescript
+interface BackendStatus {
+  loggedIn: boolean;
+  identity: string;   // email/username, or "" when not logged in
+  hint?: string;      // shown when loggedIn=false
+}
+
 interface StorageBackend {
+  // Identity
   getOwner(): Promise<string>;
+  getStatus(): Promise<BackendStatus>;
+
+  // Collections
+  discoverCollections(): Promise<Omit<CollectionInfo, "id">[]>;
   readCollection(collection: CollectionInfo): Promise<CollectionFile>;
   writeCollection(collection: CollectionInfo, data: CollectionFile): Promise<void>;
+  deleteCollection(collection: CollectionInfo): Promise<void>;
   downloadSkill(collection: CollectionInfo, skillName: string, destDir: string): Promise<void>;
-  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<void>;
+  uploadSkill(collection: CollectionInfo, localPath: string, skillName: string): Promise<string>;
+  deleteSkill(collection: CollectionInfo, skillName: string): Promise<void>;
+
+  // Registries
   discoverRegistries(): Promise<Omit<RegistryInfo, "id">[]>;
   readRegistry(registry: RegistryInfo): Promise<RegistryFile>;
   writeRegistry(registry: RegistryInfo, data: RegistryFile): Promise<void>;
   resolveCollectionRef(ref: RegistryCollectionRef): Promise<Omit<CollectionInfo, "id"> | null>;
-  createRegistry(name?: string): Promise<RegistryInfo>;
-  createCollection(name: string, repoRef?: string): Promise<CollectionInfo>;
+  createRegistry(options?: CreateRegistryOptions): Promise<RegistryInfo>;
+  createCollection(options: CreateCollectionOptions): Promise<CollectionInfo>;
 }
 ```
 
 Note: `discoverRegistries` returns without `id` — UUID assignment is handled by the config layer (`mergeRegistries()`), not the backend. This keeps backends storage-agnostic.
+
+`getStatus()` returns login state and identity without triggering auth flows. The companion `tryResolveBackend()` in `resolve.ts` constructs a backend without calling `ensureAuth()` — returns `null` for unconfigured backends (e.g. gdrive with no token) rather than launching a browser OAuth flow. Used by `skillsmanager status`.
 
 ### Implemented backends
 

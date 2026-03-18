@@ -1,4 +1,4 @@
-import type { CreateCollectionOptions, CreateRegistryOptions, StorageBackend } from "./interface.js";
+import type { BackendStatus, CreateCollectionOptions, CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import { GithubBackend } from "./github.js";
 
@@ -24,6 +24,10 @@ export class RoutingBackend implements StorageBackend {
 
   getOwner(): Promise<string> {
     return this.inner.getOwner();
+  }
+
+  getStatus(): Promise<BackendStatus> {
+    return this.inner.getStatus();
   }
 
   discoverCollections(): Promise<Omit<CollectionInfo, "id">[]> {

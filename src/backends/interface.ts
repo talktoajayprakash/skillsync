@@ -11,9 +11,16 @@ export interface CreateRegistryOptions {
   repo?: string;       // required for github; ignored by others
 }
 
+export interface BackendStatus {
+  loggedIn: boolean;
+  identity: string;  // email/username, or "" when not logged in
+  hint?: string;     // shown in place of identity when loggedIn=false
+}
+
 export interface StorageBackend {
   // ── Identity ───────────────────────────────────────────────────────────────
   getOwner(): Promise<string>; // identity of the authenticated user (email, username, etc.)
+  getStatus(): Promise<BackendStatus>;
 
   // ── Collection operations (existing) ─────────────────────────────────────
   discoverCollections(): Promise<Omit<CollectionInfo, "id">[]>;

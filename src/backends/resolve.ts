@@ -1,4 +1,5 @@
-import { ensureAuth } from "../auth.js";
+import { ensureAuth, getAuthClient, hasToken } from "../auth.js";
+import { credentialsExist } from "../config.js";
 import { GDriveBackend } from "./gdrive.js";
 import { GithubBackend } from "./github.js";
 import { LocalBackend } from "./local.js";
@@ -11,4 +12,14 @@ export async function resolveBackend(backendName: string): Promise<StorageBacken
   else if (backendName === "github") inner = new GithubBackend();
   else inner = new LocalBackend();
   return new RoutingBackend(inner);
+}
+
+/** Like resolveBackend but never triggers auth flows — returns null for unconfigured backends. */
+export async function tryResolveBackend(backendName: string): Promise<StorageBackend | null> {
+  if (backendName === "gdrive") {
+    if (!credentialsExist() || !hasToken()) return null;
+    try { return new RoutingBackend(new GDriveBackend(getAuthClient())); } catch { return null; }
+  }
+  if (backendName === "github") return new RoutingBackend(new GithubBackend());
+  return new RoutingBackend(new LocalBackend());
 }

@@ -3,7 +3,8 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { spawnSync } from "child_process";
 import chalk from "chalk";
-import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
+import type { BackendStatus, CreateRegistryOptions, StorageBackend } from "./interface.js";
+import { ghInstalled, ghAuthed, ghGetLogin } from "../commands/setup/github.js";
 import type {
   CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo,
 } from "../types.js";
@@ -95,6 +96,12 @@ export class GithubBackend implements StorageBackend {
       throw new Error("GitHub auth failed. Run: skillsmanager setup github");
     }
     return r.stdout;
+  }
+
+  async getStatus(): Promise<BackendStatus> {
+    if (!ghInstalled()) return { loggedIn: false, identity: "", hint: "install gh CLI first" };
+    if (!ghAuthed()) return { loggedIn: false, identity: "", hint: "run: skillsmanager setup github" };
+    return { loggedIn: true, identity: ghGetLogin() };
   }
 
   // ── Ensure repo exists (create private if not) ───────────────────────────────

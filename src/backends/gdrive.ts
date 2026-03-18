@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
-import type { CreateRegistryOptions, StorageBackend } from "./interface.js";
+import type { BackendStatus, CreateRegistryOptions, StorageBackend } from "./interface.js";
 import type { CollectionFile, CollectionInfo, RegistryCollectionRef, RegistryFile, RegistryInfo } from "../types.js";
 import {
   parseCollection, serializeCollection,
@@ -29,6 +29,14 @@ export class GDriveBackend implements StorageBackend {
   // Alias for backwards compat
   async getOwnerEmail(): Promise<string> {
     return this.getOwner();
+  }
+
+  async getStatus(): Promise<BackendStatus> {
+    try {
+      return { loggedIn: true, identity: await this.getOwner() };
+    } catch {
+      return { loggedIn: false, identity: "", hint: "run: skillsmanager setup google" };
+    }
   }
 
   // ── Collection operations ────────────────────────────────────────────────

@@ -42,11 +42,46 @@ The skill is cached at `~/.skillsmanager/cache/<uuid>/<skill-name>/` and symlink
 
 ### `skillsmanager list`
 
-Lists all skills available across all collections.
+Lists all skills in a tree view grouped by registry → collection → skill. GitHub collections show the source repo in the badge.
 
 ```bash
 skillsmanager list
 ```
+
+Example output:
+
+```
+REGISTRY  gdrive
+├── personal [gdrive]
+│   ├── code-review  Opinionated code review workflow
+│   └── write-tests  Generates unit tests
+└── curated [github: owner/skills-repo]
+    └── algorithmic-art  Generates algorithmic art
+```
+
+Collections not linked to any registry appear under `(unregistered)` — run `skillsmanager refresh` to link them.
+
+### `skillsmanager status`
+
+Shows the login state and identity for each backend.
+
+```bash
+skillsmanager status
+```
+
+Example output:
+
+```
+Backend   Status                    Identity
+────────  ────────────────────────  ──────────────────────────────
+local     ✓ logged in               ajay
+gdrive    ✓ logged in               you@example.com
+github    ✗ not logged in           run: skillsmanager setup github
+```
+
+Never triggers auth flows — safe to run at any time.
+
+---
 
 ### `skillsmanager search`
 
